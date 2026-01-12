@@ -1,0 +1,37 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="false" level="WARNING" enabled_by_default="false">
+      <option name="ignoredPackages">
+        <list>
+          <option value="torch" />
+          <option value="torchvision" />
+          <option value="timm" />
+          <option value="numpy" />
+          <option value="pandas" />
+          <option value="scikit-learn" />
+          <option value="matplotlib" />
+          <option value="jupyterlab" />
+          <option value="onnx" />
+          <option value="onnxruntime" />
+          <option value="gradio" />
+          <option value="streamlit" />
+          <option value="ipython" />
+          <option value="loguru" />
+          <option value="notebook" />
+          <option value="python-dotenv" />
+          <option value="ruff" />
+          <option value="tqdm" />
+          <option value="typer" />
+          <option value="Pillow" />
+          <option value="albumentations" />
+          <option value="opencv-python" />
+          <option value="tensorboard" />
+          <option value="seaborn" />
+          <option value="pyyaml" />
+          <option value="wandb" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>

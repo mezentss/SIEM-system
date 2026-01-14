@@ -1,0 +1,70 @@
+from __future__ import annotations
+
+import datetime as dt
+from typing import List
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from siem_backend.data.models import Event
+from siem_backend.services.analysis.base import BaseRule
+from siem_backend.services.analysis.types import IncidentCandidate
+
+
+class MultipleFailedLoginsRule(BaseRule):
+    name = "multiple_failed_logins"
+
+    def __init__(self, threshold: int = 5, window_minutes: int = 5) -> None:
+        self._threshold = threshold
+        self._window_minutes = window_minutes
+
+    def run(self, db: Session, *, since: dt.datetime, until: dt.datetime) -> List[IncidentCandidate]:
+        stmt = select(Event).where(Event.ts >= since).where(Event.ts <= until)
+        events = db.execute(stmt).scalars().all()
+
+        keywords = [
+            "failed password",
+            "failed login attempt",
+            "authentication failure",
+            "invalid password",
+            "login failed",
+        ]
+
+        matched: List[Event] = []
+        for e in events:
+            msg = (e.message or "").lower()
+            if any(k in msg for k in keywords):
+                matched.append(e)
+
+        count = len(matched)
+        if count < self._threshold:
+            return []
+
+        severity = "warning"
+        if count >= max(self._threshold * 2, 10):
+            severity = "critical"
+
+        last_event_id = matched[-1].id if matched else None
+
+        description = (
+            f"Multiple failed login attempts detected: {count} events within last "
+            f"{int((until - since).total_seconds() // 60)} minutes."
+        )
+
+        return [
+            IncidentCandidate(
+                incident_type=self.name,
+                severity=severity,
+                description=description,
+                detected_at=until,
+                event_id=last_event_id,
+                details={
+                    "count": count,
+                    "threshold": self._threshold,
+                    "window_minutes": self._window_minutes,
+                    "since": since.isoformat(),
+                    "until": until.isoformat(),
+                    "keywords": keywords,
+                },
+            )
+        ]

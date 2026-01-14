@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from siem_backend.services.collectors.macos import MacOSLogCollector, normalized_event_to_dict
+from siem_backend.services.collectors.mock import MockLogCollector
 from siem_backend.data.db import get_db
 from siem_backend.services.event_service import EventService
 
@@ -17,6 +18,21 @@ def collect_test(
     db: Session = Depends(get_db),
 ) -> dict:
     collector = MacOSLogCollector(last=last, max_entries=max_entries)
+    events = collector.collect()
+    saved_count = EventService().save_normalized_events(db, events)
+    return {
+        "collected_count": len(events),
+        "saved_count": saved_count,
+        "events": [normalized_event_to_dict(e) for e in events],
+    }
+
+
+@router.post("/mock")
+def collect_mock(
+    event_count: int = Query(default=18, ge=10, le=20),
+    db: Session = Depends(get_db),
+) -> dict:
+    collector = MockLogCollector(event_count=event_count)
     events = collector.collect()
     saved_count = EventService().save_normalized_events(db, events)
     return {

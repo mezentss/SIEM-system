@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from siem_backend.services.collectors.file import FileLogCollector
 from siem_backend.services.collectors.macos import MacOSLogCollector, normalized_event_to_dict
 from siem_backend.services.collectors.mock import MockLogCollector
 from siem_backend.data.db import get_db
@@ -24,6 +25,21 @@ def collect_test(
         "collected_count": len(events),
         "saved_count": saved_count,
         "events": [normalized_event_to_dict(e) for e in events],
+    }
+
+
+@router.post("/file")
+def collect_file(
+    file_path: str = Query(default="./logs/system.log"),
+    max_lines: int = Query(default=100, ge=1, le=5000),
+    db: Session = Depends(get_db),
+) -> dict:
+    collector = FileLogCollector(file_path=file_path, max_lines=max_lines)
+    events = collector.collect()
+    saved_count = EventService().save_normalized_events(db, events)
+    return {
+        "collected_count": len(events),
+        "saved_count": saved_count,
     }
 
 

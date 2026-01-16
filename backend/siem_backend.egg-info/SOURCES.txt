@@ -38,5 +38,6 @@ siem_backend/services/analysis/rules/network_errors.py
 siem_backend/services/analysis/rules/service_crash.py
 siem_backend/services/collectors/__init__.py
 siem_backend/services/collectors/base.py
+siem_backend/services/collectors/file.py
 siem_backend/services/collectors/macos.py
 siem_backend/services/collectors/mock.py

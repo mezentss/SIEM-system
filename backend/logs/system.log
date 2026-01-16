@@ -1,0 +1,50 @@
+2026-01-16 15:48:00.020405+0300  localhost gamepolicyd[582]: (RunningBoardServices) [com.apple.runningboard:monitor] Received state update for 522 (osservice<com.apple.controlcenter(501)>, running-NotVisible
+2026-01-16 15:48:00.020418+0300  localhost filecoordinationd[507]: (RunningBoardServices) [com.apple.runningboard:monitor] Received state update for 522 (osservice<com.apple.controlcenter(501)>, running-NotVisible
+2026-01-16 15:48:00.020632+0300  localhost runningboardd[162]: (RunningBoard) Created Activity ID: 0xbc5be, Parent ID: 0x80000000000baf88, Description: statesForPredicate
+2026-01-16 15:48:00.149375+0300  localhost kernel[0]: (IO80211Family) com.apple.p2p: isInfraRealtimePacketThresholdAllowed allowed:1 option:32 threshold:50 noRegistrations:1 cachedPeerCount:0 fastDiscoveryInactive:1 fastDiscoveryOnSince:30372502
+2026-01-16 15:48:00.149414+0300  localhost kernel[0]: (IO80211Family) com.apple.p2p: currentInfraTrafficType:8577 checking if realtime upgrade required with inputPackets:0 outputPackets:0 packetThreshold:50
+2026-01-16 15:48:00.149430+0300  localhost kernel[0]: (IO80211Family) com.apple.p2p: monitorInfraTraffic[8694] Infra Traffic type has changed from Transition Wait to None. AWDL is Off
+2026-01-16 15:48:00.149439+0300  localhost kernel[0]: (IO80211Family) com.apple.p2p: monitorInfraTraffic[8773]: Updating infra traffic state from Transition Wait to Idle
+2026-01-16 15:48:00.426489+0300  localhost kernel[0]: (AppleBCMWLANCore) LQM-WIFI:  (HighBand) rxToss=0 rxLastTossRsn=0 rxNoFrag=0 rxNoCmplId=0 rxNoHaddr=0 rxMulti=0 rxUndec=0
+2026-01-16 15:48:00.426514+0300  localhost kernel[0]: (AppleBCMWLANCore) LQM-WIFI:  (HighBand) rxCrsGlitch=7 rxBphyCrsGlitch=0 rxStart=558 rxBadPLCP=62 rxBphyBadPLCP=0 rxBadFCS=5 rxFifo0Ovfl=0 rxFifo1Ovfl=0 rx_nobuf=0 rxAnyErr=267 rxResponseTimeout=0 rxNoDelim=133 rxFrmTooLong=0 rxFrmTooShort=2
+2026-01-16 15:48:00.426525+0300  localhost kernel[0]: (AppleBCMWLANCore) LQM-WIFI: (HighBand) txRTSFrm=14 txRTSFail=0 rxCTSUcast=14 rxRTSUcast=0 txCTSFrm=0 txAMPDU=14 rxBACK=14 txPhyError=0 txAllFrm=83 txMPDU=2 txUcast=23 rxACKUcast=9 OfdmDesense=0 dB
+2026-01-16 15:48:00.426534+0300  localhost kernel[0]: (AppleBCMWLANCore) LQM-WIFI: (HighBand) rxBeaconMbss=50 rxBeaconObss=0 rxDataUcastMbss=14 rxMgmtUcastMbss=0 rxCNTRLUcast=69 txACKFrm=0 txBACK=14 ctxFifoFull=0 ctxFifo2Full=0 rxDataMcast=0 rxMgmtMcast=50
+2026-01-16 15:48:00.426545+0300  localhost kernel[0]: (AppleBCMWLANCore) LQM-WIFI: RX AMPDU (HighBand) rxAmpdu=14 txBACK(Ucode)=14 rxMpduInAmpdu=14 rxholes=0 rxdup=0 rxstuck=0 rxoow=0 rxoos=0 rxaddbareq=0 txaddbaresp=0 rxbar=0 txdelba=0 rxdelba=0 rxQueued=0 rxRetryNoBA=0
+2026-01-16 15:48:00.426621+0300  localhost kernel[0]: (AppleBCMWLANCore) LQM-WIFI: WME RX MPDUs (rxPER 0 %) in tids 0:0, 1:0, 2:16, 3:0, 4:0, 5:0, 6:0, 7:0
+2026-01-16 15:48:00.426664+0300  localhost kernel[0]: (corecapture) 264149.273839 wlan0.A[85208] [ik] updateLinkQualityMetrics@709:For current session updated fRxDurMulticast 3524, fRxDurBroadcast 616
+2026-01-16 15:48:00.431986+0300  localhost kernel[0]: (AppleBCMWLANCore) LQM-WIFI:  WiFi Latency: TxLat-hist  [1(100 %) / 0(0 %) / 0(0 %) / 0(0 %)]   RxLat-hist  [0(0 %) / 0(0 %) / 0(0 %) / 0(0 %)]  intermittent-state = 0
+2026-01-16 15:48:00.432037+0300  localhost kernel[0]: (IO80211Family) LQM-WIFI-CT: rssi=-66(-66 -66) snr=16 bcn=49(49) txFrames=18 txRetry=2 txRate=292500 rxFrames=32 rxRetry=10 rxRate=468000 rxToss=0
+2026-01-16 15:48:00.432327+0300  localhost airportd[189]: (IO80211) [com.apple.WiFiManager:] Driver Event: <airport[189]> _bsd_80211_event_callback: APPLE80211_M_RSSI_CHANGED (en0)
+2026-01-16 15:48:00.432500+0300  localhost airportd[189]: (IO80211) [com.apple.WiFiManager:] Driver Event: <airport[189]> _bsd_80211_event_callback: APPLE80211_M_REALTIME_SESSION_NOTIFICATION (en0)
+2026-01-16 15:48:00.432566+0300  localhost airportd[189]: (CoreWiFi) [com.apple.WiFiManager:] [corewifi] LQM: rssi=-66dBm per_ant_rssi=(-66dBm, -66dBm) noise=-89dBm snr=16 cca=5.0% ccaSelfTotal=1 ccaOtherTotal=0 interferenceTotal=3 txRate=292.5Mbps txFrames=18 txFail=0 txRetrans=2 txFallbackRate=87.8Mbps rxRate=468.0Mbps rxFrames=32 rxRetryFrames=10 rxToss=0 beaconRecv=49 beaconSched=49 txFwFrames=4 txFwFail=0 txFwRetrans=0
+2026-01-16 15:48:00.432643+0300  localhost airportd[189]: (IO80211) [com.apple.WiFiManager:] Info: <airport[189]> 11ax ASR session: new-state = 0x0
+2026-01-16 15:48:00.432675+0300  localhost airportd[189]: (IO80211) [com.apple.WiFiManager:] Info: <airport[189]> airportdProcessRealtimeSessionNotificationEvent channel score: chq = 3, tx-lat = 5, rx-lat = 3, tx-loss = 5, rx-loss = 5, p95-lat = 1, RT = 0x0, link-reco = 0x0
+2026-01-16 15:48:00.667211+0300  localhost kernel[0]: (Sandbox) 1 duplicate report for Sandbox: airportd(189) deny(1) file-read-xattr /usr/libexec/locationd
+2026-01-16 15:48:00.667237+0300  localhost kernel[0]: (Sandbox) Sandbox: mlhostd(1132) deny(1) mach-lookup com.apple.SystemConfiguration.configd
+2026-01-16 15:48:00.667294+0300  localhost launchd[1]: [gui/501 [100003]:] denied lookup: name = com.apple.SystemConfiguration.configd, flags = 0x9, requestor = mlhostd[1132], error = 159: Sandbox restriction
+2026-01-16 15:48:00.667401+0300  localhost mlhostd[1132]: (ApplePushService) [com.apple.apsd:connection] Couldn't register for console user change notifications, will retry in 30 seconds
+2026-01-16 15:48:00.783555+0300  localhost kernel[0]: (AppleBCMWLANCore) LQM-WIFI: WeightAvgLQM rssi=-66 snr=17 txRate=277062 rxRate=468000
+2026-01-16 15:48:00.783635+0300  localhost kernel[0]: (IO80211Family) LQM-WIFI: slow-wifi featureEnabled:1 Channel:36 chWidth:80 phyMode:128 nss:2 RSSI:-66 CCA:3 SNR:17 offChanDurUS:0 TVPMDurMS:0 concurrentIntDurMS:0 randomMac:0 dataStallScore:100 networkScore:100
+2026-01-16 15:48:00.783654+0300  localhost kernel[0]: (IO80211Family) LQM-WIFI: slow-wifi btAntDurMS:0 btESCO:0/0 rc1CoexDurMS:0 rc2CoexDurMS:0 lteCoexDurMS:0 totalNonWLANDurMS:0 infraDutyCycle:100 lastScanType:3
+2026-01-16 15:48:00.783660+0300  localhost kernel[0]: (IO80211Family) LQM-WIFI: slow-wifi availWLANDurMS:9801 availTxDurMS:9716 realTxDurMS:7 availRxDurMS:9794 realRxDurMS:85 measurementDurMS:9801 lastScanDurMS:342
+2026-01-16 15:48:00.783666+0300  localhost kernel[0]: (IO80211Family) LQM-WIFI: slow-wifi Tx tput (i/p:0 o/p:0 expected:0)Mbps queueFullDurMS:0 avgLatencyMS:1 maxLatencyMS:4 phyRate(mode:260 avg:263 expected:0) phyRateTputRatio:0
+2026-01-16 15:48:00.783673+0300  localhost kernel[0]: (IO80211Family) LQM-WIFI: slow-wifi Tx AMPDUDensity(actual:0 expectedAtQueueFull:0) retries:0 fails:0 fwFrames:12 hostFrames:0 hostFails:0 ctlPkts:0(73) symptomsFails:0
+2026-01-16 15:48:00.783680+0300  localhost kernel[0]: (IO80211Family) LQM-WIFI: slow-wifi TxLim[1] outputBelowExpected:0 outputBelowInput:0 lowTxFrameCount:1 queueFull:0 highLatency:0 baselineNotAllowed:0 highSymptomsFails:0
+2026-01-16 15:48:00.783703+0300  localhost kernel[0]: (IO80211Family) LQM-WIFI: slow-wifi TxLim[1] lowPhyRate:0 lowPhyRateTputRatio:0 highPER:0 highRetries:0 lowTxAMPDUDensity:0 lowCCA:0 activeCoex:0 hostFWMismatch:0
+2026-01-16 15:48:00.783709+0300  localhost kernel[0]: (IO80211Family) LQM-WIFI: slow-wifi Rx tput:0 Mbps baseline:0 Mbps overflows:0 fcsFail:5 plcpBad:62 goodPlcps:558 crsGlitches:7 fwFrames:411 ucastFWFrames:14 hostFrames:0 AmpduDUP:0 APTxDataStallPct:0 rxAmpduTxBaMismatch:0
+2026-01-16 15:48:00.783717+0300  localhost kernel[0]: (IO80211Family) LQM-WIFI: slow-wifi Rx ucast(replays:0 decryptErrs:0) mcast(replays:0 decryptErrs:0) phyRate(mode:520 avg:500 expected:0) dups:0 retries:0 phyRateTputRatio:0
+2026-01-16 15:48:00.783724+0300  localhost kernel[0]: (IO80211Family) LQM-WIFI: slow-wifi RxLim[1] highRetries:0 highPhyPER:0 highDataPER:0 highOverflows:0 highRSSI:0 lowPhyRate:0 lowPhyRateTputRatio:0
+2026-01-16 15:48:00.783729+0300  localhost kernel[0]: (IO80211Family) LQM-WIFI: slow-wifi RxLim[1] highFCSErrors:0 highDups:0 highReplays:0 highDecryptErrors:0 highMCDecryptErrors:0 lowRxFrameCount:1
+2026-01-16 15:48:00.783735+0300  localhost kernel[0]: (IO80211Family) LQM-WIFI: UI Entry curState:Idle prevState:PendingIP event:ChannelQualityUpdate data:0
+2026-01-16 15:48:00.783742+0300  localhost kernel[0]: (IO80211Family) LQM-WIFI: UI Suboptimal link during idle
+2026-01-16 15:48:00.783744+0300  localhost kernel[0]: (IO80211Family) LQM-WIFI: UI Exit curState:Idle prevState:PendingIP
+2026-01-16 15:48:00.786274+0300  localhost kernel[0]: (IO80211Family) LQM-WIFI-CT: rssi=-66(-66 -67) snr=17 bcn=49(49) txFrames=18 txRetry=2 txRate=292500 rxFrames=32 rxRetry=10 rxRate=468000 rxToss=0
+2026-01-16 15:48:00.786517+0300  localhost airportd[189]: (IO80211) [com.apple.WiFiManager:] Driver Event: <airport[189]> _bsd_80211_event_callback: APPLE80211_M_RSSI_CHANGED (en0)
+2026-01-16 15:48:00.896656+0300  localhost kernel[0]: connect() - failed necp_set_socket_domain_attributes
+2026-01-16 15:48:00.914257+0300  localhost powerd[103]: [com.apple.powerd:displayState] DesktopMode check on Battery 0
+2026-01-16 15:48:00.948514+0300  localhost log[32477]: (libsystem_info.dylib) Created Activity ID: 0xbc680, Description: Retrieve User by ID
+2026-01-16 15:48:00.949923+0300  localhost log[32477]: (libxpc.dylib) [com.apple.xpc:connection] [0x6000025680f0] activating connection: mach=true listener=false peer=false name=com.apple.logd.admin
+2026-01-16 15:48:00.950924+0300  localhost log[32477]: (libsystem_info.dylib) Created Activity ID: 0xbc681, Description: Membership API: translate identifier
+2026-01-16 15:48:00.953383+0300  localhost fseventsd[94]: (libsystem_info.dylib) Created Activity ID: 0xbc2b4, Description: Resolve user group list
+2026-01-16 15:48:00.953386+0300  localhost fseventsd[94]: (libsystem_info.dylib) Created Activity ID: 0xbc2b5, Description: Resolve user group list
+2026-01-16 15:48:00.954464+0300  localhost fseventsd[94]: (libsystem_info.dylib) Created Activity ID: 0xbc2b6, Description: Resolve user group list

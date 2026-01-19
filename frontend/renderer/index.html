@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Система мониторинга SIEM</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Система мониторинга SIEM</h1>
+    </header>
+
+    <main>
+      <div class="controls">
+        <button id="loadEventsBtn">Загрузить события</button>
+        <button id="runAnalysisBtn">Запустить анализ</button>
+        <button id="generateMockBtn">Собрать события из файла</button>
+      </div>
+
+      <div class="output">
+        <h2>Результат</h2>
+        <pre id="outputArea">Нажмите кнопку выше для взаимодействия с backend.</pre>
+      </div>
+    </main>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "name": "siem-frontend",
+  "version": "0.1.0",
+  "description": "SIEM Monitoring System Frontend (Electron)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [
+    "siem",
+    "monitoring",
+    "electron"
+  ],
+  "author": "SIEM Team",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^25.3.1"
+  }
+}

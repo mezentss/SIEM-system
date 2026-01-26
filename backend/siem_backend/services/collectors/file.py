@@ -3,10 +3,10 @@ from __future__ import annotations
 import datetime as dt
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from siem_backend.services.collectors.base import LogCollector
-from siem_backend.services.normalization import NormalizedEvent
+from siem_backend.services.normalization import EventClassifier, NormalizedEvent
 
 
 class FileLogCollector(LogCollector):
@@ -36,12 +36,17 @@ class FileLogCollector(LogCollector):
                 "raw_line": line,
             }
 
+            event_type = EventClassifier.classify_event_type(msg, raw_data)
+            source_category = EventClassifier.classify_source_category(msg, raw_data, "macos")
+            severity = self._determine_severity(msg)
+
             events.append(
                 NormalizedEvent(
                     ts=ts,
                     source_os="macos",
-                    event_type="file_log",
-                    severity="low",
+                    source_category=source_category,
+                    event_type=event_type,
+                    severity=severity,
                     message=msg,
                     raw_data=raw_data,
                 )
@@ -49,7 +54,18 @@ class FileLogCollector(LogCollector):
 
         return events
 
-    def _parse_line(self, line: str) -> tuple[str, str]:
+    def _determine_severity(self, message: str) -> str:
+        """Определяет уровень важности на основе сообщения."""
+        msg_lower = message.lower()
+        if any(kw in msg_lower for kw in ["error", "failed", "failure", "denied", "refused"]):
+            return "high"
+        if any(kw in msg_lower for kw in ["warning", "warn", "timeout"]):
+            return "medium"
+        if any(kw in msg_lower for kw in ["critical", "panic", "crash", "fatal"]):
+            return "critical"
+        return "low"
+
+    def _parse_line(self, line: str) -> Tuple[str, str]:
         # Supported formats (best-effort):
         # - ISO: 2026-01-16T12:34:56Z message
         # - syslog-like: Jan 16 12:34:56 hostname process[pid]: message

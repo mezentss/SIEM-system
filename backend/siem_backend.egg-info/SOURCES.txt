@@ -13,8 +13,12 @@ siem_backend/api/routes/analyze.py
 siem_backend/api/routes/collect.py
 siem_backend/api/routes/events.py
 siem_backend/api/routes/health.py
+siem_backend/api/routes/incidents.py
+siem_backend/api/routes/notifications.py
 siem_backend/api/schemas/__init__.py
 siem_backend/api/schemas/events.py
+siem_backend/api/schemas/incidents.py
+siem_backend/api/schemas/notifications.py
 siem_backend/core/__init__.py
 siem_backend/core/config.py
 siem_backend/core/logging.py
@@ -23,11 +27,14 @@ siem_backend/data/db.py
 siem_backend/data/event_repository.py
 siem_backend/data/incident_repository.py
 siem_backend/data/models.py
+siem_backend/data/notification_repository.py
 siem_backend/services/__init__.py
 siem_backend/services/analysis_engine.py
 siem_backend/services/event_service.py
 siem_backend/services/incident_service.py
 siem_backend/services/normalization.py
+siem_backend/services/notifications.py
+siem_backend/services/system_log_exporter.py
 siem_backend/services/analysis/__init__.py
 siem_backend/services/analysis/base.py
 siem_backend/services/analysis/engine.py

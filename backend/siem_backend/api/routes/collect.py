@@ -8,6 +8,7 @@ from siem_backend.services.collectors.macos import MacOSLogCollector, normalized
 from siem_backend.services.collectors.mock import MockLogCollector
 from siem_backend.data.db import get_db
 from siem_backend.services.event_service import EventService
+from siem_backend.services.system_log_exporter import SystemLogExporter
 
 router = APIRouter()
 
@@ -55,4 +56,51 @@ def collect_mock(
         "collected_count": len(events),
         "saved_count": saved_count,
         "events": [normalized_event_to_dict(e) for e in events],
+    }
+
+
+@router.post("/system")
+def collect_system(
+    last_minutes: int = Query(default=5, ge=1, le=60),
+    max_lines: int = Query(default=200, ge=1, le=5000),
+    db: Session = Depends(get_db),
+) -> dict:
+    """
+    Собирает реальные логи macOS и сохраняет события в БД.
+
+    Процесс:
+    1. Экспортирует системные логи macOS в backend/logs/system.log
+    2. Читает файл через FileLogCollector
+    3. Сохраняет события в БД
+
+    Args:
+        last_minutes: Количество минут для получения логов (1-60)
+        max_lines: Максимальное количество строк для обработки (1-5000)
+
+    Returns:
+        Словарь с результатами экспорта и сбора
+    """
+    # Шаг 1: Экспорт логов ОС в файл
+    exporter = SystemLogExporter(output_file="./logs/system.log")
+    exported = exporter.export_logs(last_minutes=last_minutes)
+
+    if not exported:
+        return {
+            "exported": False,
+            "collected_count": 0,
+            "saved_count": 0,
+            "error": "Failed to export system logs",
+        }
+
+    # Шаг 2: Чтение файла через FileLogCollector
+    collector = FileLogCollector(file_path="./logs/system.log", max_lines=max_lines)
+    events = collector.collect()
+
+    # Шаг 3: Сохранение событий в БД
+    saved_count = EventService().save_normalized_events(db, events)
+
+    return {
+        "exported": True,
+        "collected_count": len(events),
+        "saved_count": saved_count,
     }

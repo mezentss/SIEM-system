@@ -18,7 +18,12 @@ class ServiceCrashOrRestartRule(BaseRule):
         self._threshold = threshold
 
     def run(self, db: Session, *, since: dt.datetime, until: dt.datetime) -> List[IncidentCandidate]:
-        stmt = select(Event).where(Event.ts >= since).where(Event.ts <= until)
+        stmt = (
+            select(Event)
+            .where(Event.ts >= since)
+            .where(Event.ts <= until)
+            .where(Event.event_type == "service")
+        )
         events = db.execute(stmt).scalars().all()
 
         keywords = [

@@ -19,13 +19,18 @@ class RepeatedNetworkErrorsRule(BaseRule):
         self._window_minutes = window_minutes
 
     def run(self, db: Session, *, since: dt.datetime, until: dt.datetime) -> List[IncidentCandidate]:
-        stmt = select(Event).where(Event.ts >= since).where(Event.ts <= until)
+        stmt = (
+            select(Event)
+            .where(Event.ts >= since)
+            .where(Event.ts <= until)
+            .where(Event.event_type == "network")
+        )
         events = db.execute(stmt).scalars().all()
 
         keywords = [
-            "network",
-            "dns",
-            "connection refused",
+            "error",
+            "failed",
+            "refused",
             "timeout",
             "timed out",
             "unreachable",

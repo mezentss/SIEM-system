@@ -12,6 +12,7 @@ from siem_backend.services.analysis.engine import RuleEngine
 from siem_backend.services.analysis.rules.failed_logins import MultipleFailedLoginsRule
 from siem_backend.services.analysis.rules.network_errors import RepeatedNetworkErrorsRule
 from siem_backend.services.analysis.rules.service_crash import ServiceCrashOrRestartRule
+from siem_backend.services.notifications import NotificationService
 
 
 class IncidentService:
@@ -19,9 +20,11 @@ class IncidentService:
         self,
         repo: Optional[IncidentRepository] = None,
         engine: Optional[RuleEngine] = None,
+        notification_service: Optional[NotificationService] = None,
     ) -> None:
         self._repo = repo or IncidentRepository()
         self._engine = engine or RuleEngine(self._default_rules())
+        self._notification_service = notification_service or NotificationService()
 
     def run_analysis(self, db: Session, since_minutes: int = 60) -> int:
         until = dt.datetime.utcnow()
@@ -29,7 +32,15 @@ class IncidentService:
 
         candidates = self._engine.run(db, since=since, until=until)
         incidents = [self._to_model(c) for c in candidates]
-        return self._repo.add_many(db, incidents)
+        saved_count = self._repo.add_many(db, incidents)
+
+        for incident in incidents:
+            try:
+                self._notification_service.notify_incident(db, incident)
+            except Exception:
+                pass
+
+        return saved_count
 
     def _default_rules(self) -> List[BaseRule]:
         return [

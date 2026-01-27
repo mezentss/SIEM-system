@@ -13,6 +13,9 @@ class IncidentOut(BaseModel):
     detected_at: dt.datetime
     incident_type: str
     severity: str
+    # Техническое описание (как сформировано правилом анализа)
     description: str
+    # Дополнительное человеко-читаемое описание для фронтенда
+    friendly_description: str = ""
     event_id: Optional[int]
     details: dict

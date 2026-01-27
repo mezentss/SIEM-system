@@ -15,4 +15,6 @@ class EventOut(BaseModel):
     event_type: str
     severity: str
     message: str
+    # Человеко-читаемое описание события для отображения на фронтенде
+    description: str = ""
     raw_data: dict

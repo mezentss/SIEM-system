@@ -45,7 +45,7 @@ async function loadSeverityOverview(lastDays = 3) {
 
   try {
     // Загружаем ИНЦИДЕНТЫ (incidents), а не события (events)
-    const data = await apiCall(`${API_BASE}/api/incidents/?limit=1000&offset=0`);
+    const data = await apiCall(`${API_BASE}/api/incidents/?limit=500&offset=0`);
 
     if (!Array.isArray(data) || data.length === 0) {
       drawEmptyChart(canvas, totalEl);

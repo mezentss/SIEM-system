@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from siem_backend.api.schemas.incidents import IncidentOut
 from siem_backend.data.db import get_db
 from siem_backend.data.models import Incident
+from siem_backend.services.event_formatter import format_incident_friendly_description
 
 router = APIRouter()
 
@@ -31,7 +32,15 @@ def list_incidents(
         stmt = stmt.where(Incident.incident_type == incident_type)
 
     rows = db.execute(stmt).scalars().all()
-    return [IncidentOut.model_validate(r) for r in rows]
+
+    result: list[IncidentOut] = []
+    for row in rows:
+        item = IncidentOut.model_validate(row)
+        # Формируем человеко-читаемое описание инцидента
+        item.friendly_description = format_incident_friendly_description(row)
+        result.append(item)
+
+    return result
 
 
 @router.get("/{incident_id}", response_model=IncidentOut)

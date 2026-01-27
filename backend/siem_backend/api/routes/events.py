@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from siem_backend.api.schemas.events import EventOut
 from siem_backend.data.db import get_db
 from siem_backend.data.models import Event
+from siem_backend.services.event_formatter import format_event_description
 
 router = APIRouter()
 
@@ -25,4 +26,11 @@ def list_events(
         stmt = stmt.where(Event.severity == severity)
 
     rows = db.execute(stmt).scalars().all()
-    return [EventOut.model_validate(r) for r in rows]
+    result: list[EventOut] = []
+    for row in rows:
+        item = EventOut.model_validate(row)
+        # Формируем человеко-читаемое описание события
+        item.description = format_event_description(row)
+        result.append(item)
+
+    return result

@@ -13,16 +13,40 @@
     </header>
 
     <main>
-      <div class="controls">
-        <button id="loadEventsBtn">Загрузить события</button>
-        <button id="runAnalysisBtn">Запустить анализ</button>
-        <button id="generateMockBtn">Собрать события из файла</button>
-      </div>
+      <section class="dashboard">
+        <div class="syslog-card">
+          <div class="syslog-header">
+            <div>
+              <h2>Инциденты по серьёзности</h2>
+              <div class="syslog-period" id="severityPeriod">за последние 3 дня</div>
+            </div>
+          </div>
 
-      <div class="output">
+          <div class="syslog-body">
+            <div class="syslog-chart-wrap">
+              <canvas id="severityChart" width="260" height="260"></canvas>
+              <div class="syslog-total" id="severityTotal">0</div>
+            </div>
+            <div class="syslog-legend" id="severityLegend">
+              <!-- легенда заполняется из JS -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="controls-section">
+        <div class="controls">
+          <button id="loadEventsBtn">Загрузить события</button>
+          <button id="runAnalysisBtn">Запустить анализ</button>
+          <button id="generateMockBtn">Собрать события из файла</button>
+            <button id="loadIncidentsBtn">Загрузить инциденты</button>
+        </div>
+      </section>
+
+      <section class="output">
         <h2>Результат</h2>
         <pre id="outputArea">Нажмите кнопку выше для взаимодействия с backend.</pre>
-      </div>
+      </section>
     </main>
   </div>
 

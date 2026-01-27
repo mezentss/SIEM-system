@@ -7,9 +7,9 @@ body {
 }
 
 .container {
-  max-width: 900px;
+  max-width: 1100px;
   margin: 2rem auto;
-  padding: 1rem;
+  padding: 1rem 1.5rem 2rem;
   background-color: #fff;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -21,11 +21,136 @@ header h1 {
   margin-bottom: 1.5rem;
 }
 
+/* ==== Dashboard / Syslog card ==== */
+
+.dashboard {
+  margin-bottom: 2rem;
+}
+
+.syslog-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e0e4ec;
+  border-radius: 8px;
+  padding: 1rem 1.5rem 1.25rem;
+  background: #f9fbff;
+}
+
+.syslog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.syslog-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #2c3e50;
+}
+
+.syslog-period {
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  margin-top: 0.1rem;
+}
+
+.syslog-body {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.syslog-chart-wrap {
+  position: relative;
+  width: 260px;
+  height: 260px;
+  flex-shrink: 0;
+}
+
+#severityChart {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.syslog-total {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #e67e22;
+}
+
+/* легенда */
+
+.syslog-legend {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.severity-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.severity-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 120px;
+}
+
+.severity-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.severity-bar-wrap {
+  flex: 1;
+  height: 6px;
+  background: #e1e5f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.severity-bar {
+  height: 100%;
+  background: #3498db;
+  border-radius: 4px;
+}
+
+.severity-count {
+  width: 50px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #2c3e50;
+}
+
+.severity-legend-empty {
+  font-size: 0.9rem;
+  color: #95a5a6;
+}
+
+/* ==== controls & output ==== */
+
+.controls-section {
+  margin-bottom: 1.5rem;
+}
+
 .controls {
   display: flex;
   gap: 1rem;
   justify-content: center;
-  margin-bottom: 2rem;
+  flex-wrap: wrap;
 }
 
 .controls button {
@@ -48,7 +173,7 @@ header h1 {
 }
 
 .output h2 {
-  margin-bottom: 1rem;
+  margin-bottom: 0.6rem;
   color: #2c3e50;
 }
 
@@ -61,4 +186,22 @@ header h1 {
   word-wrap: break-word;
   max-height: 400px;
   overflow-y: auto;
+}
+
+/* адаптивность */
+
+@media (max-width: 900px) {
+  .syslog-body {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .syslog-chart-wrap {
+    width: 220px;
+    height: 220px;
+  }
+
+  .syslog-legend {
+    width: 100%;
+  }
 }

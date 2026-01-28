@@ -29,6 +29,7 @@ def _check_table_schema(table_name: str, required_columns: List[str]) -> bool:
 
 def init_db() -> None:
     from siem_backend.data import models  # noqa: F401
+    from siem_backend.data.initial_data import init_reference_data
 
     # Требуемые колонки для каждой таблицы
     required_columns = {
@@ -61,6 +62,13 @@ def init_db() -> None:
 
     # Создаем все таблицы с актуальной схемой
     Base.metadata.create_all(bind=engine)
+
+    # Инициализируем справочные данные (idempotent / безопасно при повторных вызовах)
+    db = SessionLocal()
+    try:
+        init_reference_data(db)
+    finally:
+        db.close()
 
 
 def get_db() -> Iterator[Session]:

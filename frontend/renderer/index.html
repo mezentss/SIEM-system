@@ -13,40 +13,121 @@
     </header>
 
     <main>
-      <section class="dashboard">
-        <div class="syslog-card">
-          <div class="syslog-header">
-            <div>
-              <h2>Инциденты по серьёзности</h2>
-              <div class="syslog-period" id="severityPeriod">за последние 3 дня</div>
+      <section id="view-dashboard">
+        <section class="dashboard">
+          <div class="syslog-card">
+            <div class="syslog-header">
+              <div>
+                <h2>Инциденты по серьёзности</h2>
+                <div class="syslog-period" id="severityPeriod">за последние 3 дня</div>
+              </div>
+            </div>
+
+            <div class="syslog-body">
+              <div class="syslog-chart-wrap">
+                <canvas id="severityChart" width="260" height="260"></canvas>
+                <div class="syslog-total" id="severityTotal">0</div>
+              </div>
+              <div class="syslog-legend" id="severityLegend">
+                <!-- легенда заполняется из JS -->
+              </div>
             </div>
           </div>
+        </section>
 
-          <div class="syslog-body">
-            <div class="syslog-chart-wrap">
-              <canvas id="severityChart" width="260" height="260"></canvas>
-              <div class="syslog-total" id="severityTotal">0</div>
-            </div>
-            <div class="syslog-legend" id="severityLegend">
-              <!-- легенда заполняется из JS -->
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="controls-section">
-        <div class="controls">
-          <button id="loadEventsBtn">Загрузить события</button>
-          <button id="runAnalysisBtn">Запустить анализ</button>
-          <button id="generateMockBtn">Собрать события из файла</button>
+        <section class="controls-section">
+          <div class="controls">
+            <button id="loadEventsBtn">Загрузить события</button>
+            <button id="runAnalysisBtn">Запустить анализ</button>
+            <button id="generateMockBtn">Собрать события из файла</button>
             <button id="loadIncidentsBtn">Загрузить инциденты</button>
-        </div>
+          </div>
+        </section>
+
+        <section class="output">
+          <h2>Результат</h2>
+          <pre id="outputArea">Нажмите кнопку выше для взаимодействия с backend.</pre>
+        </section>
       </section>
 
-      <section class="output">
-        <h2>Результат</h2>
-        <pre id="outputArea">Нажмите кнопку выше для взаимодействия с backend.</pre>
+      <section id="view-incidents" class="incidents-view" hidden>
+        <div class="incidents-header">
+          <button id="backToDashboardBtn" class="back-btn" type="button">Назад</button>
+          <div>
+            <h2 id="incidentsTitle">Инциденты</h2>
+            <div id="incidentsSubtitle" class="incidents-subtitle"></div>
+          </div>
+          <div class="incidents-header-actions">
+            <button id="showIncidentsListBtn" class="details-btn" type="button">Подробнее</button>
+          </div>
+        </div>
+
+        <div id="incidentsStatus" class="incidents-status"></div>
+
+        <div class="incidents-table-wrap">
+          <table class="incidents-table">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>Время</th>
+                <th>Тип</th>
+                <th>Приложение/служба</th>
+                <th>Описание</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="incidentsTbody"></tbody>
+          </table>
+        </div>
+
+        <div id="incidentsEmpty" class="incidents-empty" hidden>Нет инцидентов по выбранной категории</div>
       </section>
+
+      <div id="incidentModal" class="modal" hidden>
+        <div class="modal-backdrop" id="incidentModalBackdrop"></div>
+        <div class="modal-dialog" role="dialog" aria-modal="true">
+          <div class="modal-header">
+            <div>
+              <div class="modal-title" id="incidentModalTitle">Инцидент</div>
+              <div class="modal-subtitle" id="incidentModalSubtitle"></div>
+            </div>
+            <button id="incidentModalCloseBtn" class="modal-close" type="button">Закрыть</button>
+          </div>
+          <div class="modal-body">
+            <div class="modal-grid">
+              <div class="modal-field">
+                <div class="modal-label">Дата</div>
+                <div class="modal-value" id="incidentModalDate">-</div>
+              </div>
+              <div class="modal-field">
+                <div class="modal-label">Время</div>
+                <div class="modal-value" id="incidentModalTime">-</div>
+              </div>
+              <div class="modal-field">
+                <div class="modal-label">Серьёзность</div>
+                <div class="modal-value" id="incidentModalSeverity">-</div>
+              </div>
+              <div class="modal-field">
+                <div class="modal-label">Тип</div>
+                <div class="modal-value" id="incidentModalType">-</div>
+              </div>
+              <div class="modal-field modal-field-wide">
+                <div class="modal-label">Приложение/служба</div>
+                <div class="modal-value" id="incidentModalPlace">-</div>
+              </div>
+              <div class="modal-field modal-field-wide">
+                <div class="modal-label">Описание</div>
+                <div class="modal-value" id="incidentModalDescription">-</div>
+              </div>
+            </div>
+
+            <div class="modal-section">
+              <div class="modal-label">Детали (JSON)</div>
+              <pre class="modal-json" id="incidentModalDetails">{}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 

@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,6 +9,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     database_url: str = "sqlite:///./siem.db"
+
+    telegram_bot_token: Optional[str] = None
+    telegram_chat_id: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

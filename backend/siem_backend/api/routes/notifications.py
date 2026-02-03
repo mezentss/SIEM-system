@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from siem_backend.api.schemas.notifications import NotificationOut
 from siem_backend.data.db import get_db
 from siem_backend.data.models import Notification
+from siem_backend.services.notifications import NotificationService
 
 router = APIRouter()
 
@@ -23,7 +24,6 @@ def list_notifications(
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> list[NotificationOut]:
-    """Получить список уведомлений с фильтрацией."""
     stmt = select(Notification).order_by(Notification.created_at.desc()).limit(limit).offset(offset)
 
     if severity is not None:
@@ -47,11 +47,27 @@ def get_notification(
     notification_id: int,
     db: Session = Depends(get_db),
 ) -> NotificationOut:
-    """Получить детали конкретного уведомления."""
+    from fastapi import HTTPException
+
     stmt = select(Notification).where(Notification.id == notification_id)
     notification = db.execute(stmt).scalar_one_or_none()
 
     if notification is None:
         raise HTTPException(status_code=404, detail="Notification not found")
 
+    return NotificationOut.model_validate(notification)
+
+
+@router.post("/test", response_model=NotificationOut)
+def send_test_notification(
+    db: Session = Depends(get_db),
+) -> NotificationOut:
+    service = NotificationService()
+    notification = service.create_notification(
+        db=db,
+        notification_type="test",
+        severity="critical",
+        title="SIEM test notification",
+        message="Это тестовое уведомление из SIEM через Telegram.",
+    )
     return NotificationOut.model_validate(notification)

@@ -1,472 +1,61 @@
 const API_BASE = 'http://127.0.0.1:8000';
 
+const SEEN_INCIDENTS_KEY = 'siem_seen_incident_ids';
+const POLL_INTERVAL_MS = 10000;
+
+let allIncidents = [];
+let seenIncidentIds = new Set();
+
+function loadSeenIncidentIds() {
+  try {
+    const raw = localStorage.getItem(SEEN_INCIDENTS_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      seenIncidentIds = new Set(Array.isArray(arr) ? arr : []);
+    }
+  } catch (_) {
+    seenIncidentIds = new Set();
+  }
+}
+
+function saveSeenIncidentIds() {
+  try {
+    localStorage.setItem(SEEN_INCIDENTS_KEY, JSON.stringify([...seenIncidentIds]));
+  } catch (_) {}
+}
+
 function showOutput(text) {
   const outputArea = document.getElementById('outputArea');
-  outputArea.textContent = text;
+  if (outputArea) outputArea.textContent = text;
 }
 
 async function apiCall(url, options = {}) {
-  try {
-    return await window.electronAPI.fetch(url, options);
-  } catch (error) {
-    const message = error && typeof error.message === 'string' ? error.message : String(error);
-
-    if (
-      message.includes('Failed to fetch') ||
-      message.includes('fetch failed') ||
-      message.includes('NetworkError')
-    ) {
-      throw new Error('Backend недоступен');
-    }
-
-    throw new Error(message || 'Ошибка связи с backend');
-  }
-}
-
-/**
- * ==== БЛОК: агрегация и диаграмма по серьёзности СЕКЦИЙ ====
- */
-
-const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low'];
-const SEVERITY_LABELS = {
-  critical: 'Критическая',
-  high: 'Высокая',
-  medium: 'Средняя',
-  low: 'Низкая',
-};
-const SEVERITY_COLORS = {
-  critical: '#d62728',
-  high: '#1f77b4',
-  medium: '#ff7f0e',
-  low: '#6baed6',
-};
-
-const INCIDENT_TYPE_LABELS = {
-  multiple_failed_logins: 'Множественные неудачные попытки входа',
-  repeated_network_errors: 'Повторяющиеся сетевые ошибки',
-  service_crash_or_restart: 'Сбой или перезапуск службы',
-};
-
-const appState = {
-  incidents: [],
-  incidentsLoading: false,
-  incidentsError: null,
-  incidentsLastUpdatedAt: 0,
-  pollingTimerId: null,
-  pollingInFlight: false,
-  severitySlices: [],
-};
-
-function getRoute() {
-  const raw = (window.location.hash || '').replace(/^#/, '');
-  const [path, queryString] = raw.split('?');
-  const params = new URLSearchParams(queryString || '');
-
-  const view = path || 'dashboard';
-  const severity = (params.get('severity') || '').toLowerCase();
-  const mode = (params.get('mode') || '').toLowerCase();
-
-  return {
-    view,
-    severity,
-    mode,
-  };
-}
-
-function navigateToDashboard() {
-  window.location.hash = '#dashboard';
-}
-
-function navigateToIncidents(severity) {
-  const sev = (severity || '').toLowerCase();
-  window.location.hash = `#incidents?severity=${encodeURIComponent(sev)}`;
-}
-
-function navigateToIncidentsList(severity) {
-  const sev = (severity || '').toLowerCase();
-  window.location.hash = `#incidents?severity=${encodeURIComponent(sev)}&mode=list`;
-}
-
-function setView(view) {
-  const dashboardEl = document.getElementById('view-dashboard');
-  const incidentsEl = document.getElementById('view-incidents');
-
-  if (!dashboardEl || !incidentsEl) {
-    return;
-  }
-
-  if (view === 'incidents') {
-    dashboardEl.hidden = true;
-    incidentsEl.hidden = false;
-    return;
-  }
-
-  dashboardEl.hidden = false;
-  incidentsEl.hidden = true;
-}
-
-function formatDateTimeParts(isoString) {
-  const ts = Date.parse(isoString || '');
-  if (Number.isNaN(ts)) {
-    return { date: '-', time: '-' };
-  }
-  const d = new Date(ts);
-  return {
-    date: d.toLocaleDateString('ru-RU'),
-    time: d.toLocaleTimeString('ru-RU'),
-  };
-}
-
-function getIncidentPlace(details) {
-  const d = details || {};
-  const place = (
-    d.application ||
-    d.service ||
-    d.process ||
-    d.app ||
-    d.source ||
-    d.detector ||
-    d.origin ||
-    ''
-  );
-
-  const normalized = String(place || '').trim();
-  if (!normalized) return 'Не определено';
-  if (/^\d+$/.test(normalized)) return 'Не определено';
-  return normalized;
-}
-
-function setIncidentModalOpen(isOpen) {
-  const modal = document.getElementById('incidentModal');
-  if (!modal) return;
-
-  modal.hidden = !isOpen;
-}
-
-function openIncidentModal(incident) {
-  const modalTitle = document.getElementById('incidentModalTitle');
-  const modalSubtitle = document.getElementById('incidentModalSubtitle');
-  const modalDate = document.getElementById('incidentModalDate');
-  const modalTime = document.getElementById('incidentModalTime');
-  const modalSeverity = document.getElementById('incidentModalSeverity');
-  const modalType = document.getElementById('incidentModalType');
-  const modalPlace = document.getElementById('incidentModalPlace');
-  const modalDescription = document.getElementById('incidentModalDescription');
-  const modalDetails = document.getElementById('incidentModalDetails');
-
-  if (
-    !modalTitle ||
-    !modalSubtitle ||
-    !modalDate ||
-    !modalTime ||
-    !modalSeverity ||
-    !modalType ||
-    !modalPlace ||
-    !modalDescription ||
-    !modalDetails
-  ) {
-    return;
-  }
-
-  const parts = formatDateTimeParts(incident?.detected_at);
-  const sev = (incident?.severity || '').toLowerCase();
-  const place = getIncidentPlace(incident?.details);
-  const desc = incident?.friendly_description || incident?.description || '-';
-  const typeCode = incident?.incident_type || '';
-  const typeLabel = INCIDENT_TYPE_LABELS[typeCode] || typeCode || '-';
-
-  modalTitle.textContent = `Инцидент #${incident?.id ?? '-'}`;
-  modalSubtitle.textContent = [
-    SEVERITY_LABELS[sev] ? `Серьёзность: ${SEVERITY_LABELS[sev]}` : '',
-    typeLabel ? `Тип: ${typeLabel}` : '',
-  ].filter(Boolean).join(' · ');
-
-  modalDate.textContent = parts.date;
-  modalTime.textContent = parts.time;
-  modalSeverity.textContent = SEVERITY_LABELS[sev] || incident?.severity || '-';
-  modalType.textContent = typeLabel;
-  modalPlace.textContent = place;
-  modalDescription.textContent = desc;
-
-  try {
-    modalDetails.textContent = JSON.stringify(incident?.details || {}, null, 2);
-  } catch (_e) {
-    modalDetails.textContent = '{}';
-  }
-
-  setIncidentModalOpen(true);
-}
-
-function closeIncidentModal() {
-  setIncidentModalOpen(false);
-}
-
-async function refreshIncidents(options = {}) {
-  if (appState.incidentsLoading) {
-    return appState.incidents;
-  }
-
-  appState.incidentsLoading = true;
-  appState.incidentsError = null;
-
-  try {
-    const data = await apiCall(`${API_BASE}/api/incidents/?limit=500&offset=0`);
-    const arr = Array.isArray(data) ? data : [];
-    arr.sort((a, b) => {
-      const ta = Date.parse(a?.detected_at || '') || 0;
-      const tb = Date.parse(b?.detected_at || '') || 0;
-      return tb - ta;
-    });
-
-    appState.incidents = arr;
-    appState.incidentsLastUpdatedAt = Date.now();
-    return arr;
-  } catch (error) {
-    appState.incidentsError = error;
-    if (!options.silent) {
-      throw error;
-    }
-    return appState.incidents;
-  } finally {
-    appState.incidentsLoading = false;
-  }
-}
-
-function startIncidentsPolling() {
-  if (appState.pollingTimerId) {
-    return;
-  }
-
-  appState.pollingTimerId = setInterval(() => {
-    pollTick().catch(() => {});
-  }, 10000);
-}
-
-async function pollTick() {
-  if (appState.pollingInFlight) {
-    return;
-  }
-
-  appState.pollingInFlight = true;
-  try {
-    // Чтобы появлялись новые инциденты без ручного клика, периодически запускаем анализ.
-    // Дедупликация на backend защищает от спама одинаковыми инцидентами.
-    await apiCall(`${API_BASE}/api/analyze/run?since_minutes=60`, { method: 'POST' });
-  } catch (_e) {
-    // В polling ошибки не показываем пользователю (не спамим), просто пропускаем тик.
-  }
-
-  try {
-    await refreshIncidents({ silent: true });
-    await renderCurrentRoute({ silent: true });
-  } finally {
-    appState.pollingInFlight = false;
-  }
-}
-
-async function renderCurrentRoute(options = {}) {
-  const route = getRoute();
-  if (route.view === 'incidents') {
-    setView('incidents');
-    await renderIncidentsView(route, options);
-    return;
-  }
-
-  setView('dashboard');
-  await loadSeverityOverview(3, options);
-}
-
-async function loadSeverityOverview(lastDays = 3, options = {}) {
-  const canvas = document.getElementById('severityChart');
-  const legendContainer = document.getElementById('severityLegend');
-  const totalEl = document.getElementById('severityTotal');
-  const periodEl = document.getElementById('severityPeriod');
-
-  if (!canvas || !legendContainer || !totalEl || !periodEl) {
-    return;
-  }
-
-  periodEl.textContent = `за последние ${lastDays} дня`;
-
-  try {
-    const data = await refreshIncidents({ silent: !!options.silent });
-
-    if (!Array.isArray(data) || data.length === 0) {
-      drawEmptyChart(canvas, totalEl);
-      legendContainer.innerHTML = '<div class="severity-legend-empty">Нет инцидентов за выбранный период</div>';
-      return;
-    }
-
-    const now = Date.now();
-    const cutoff = now - lastDays * 24 * 60 * 60 * 1000;
-
-    // Фильтруем инциденты по дате
-    const recentIncidents = data.filter((incident) => {
-      if (!incident.detected_at) return false;
-      const detectedAt = Date.parse(incident.detected_at);
-      if (Number.isNaN(detectedAt)) return false;
-      return detectedAt >= cutoff;
-    });
-
-    if (recentIncidents.length === 0) {
-      drawEmptyChart(canvas, totalEl);
-      legendContainer.innerHTML = '<div class="severity-legend-empty">Нет инцидентов за выбранный период</div>';
-      return;
-    }
-
-    // Считаем инциденты по уровням серьёзности
-    const counts = {
-      critical: 0,
-      high: 0,
-      medium: 0,
-      low: 0,
-    };
-
-    for (const incident of recentIncidents) {
-      const sev = (incident.severity || '').toLowerCase();
-      if (sev in counts) {
-        counts[sev] += 1;
-      } else {
-        // Всё неизвестное считаем как low
-        counts.low += 1;
+  const response = await window.electronAPI.fetch(url, options);
+  if (response && typeof response === 'object' && typeof response.ok === 'boolean') {
+    if (!response.ok) {
+      let text = '';
+      if (typeof response.text === 'function') {
+        try {
+          text = await response.text();
+        } catch (_) {}
       }
+      throw new Error(text || `HTTP ${response.status}`);
     }
-
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    if (total === 0) {
-      drawEmptyChart(canvas, totalEl);
-      legendContainer.innerHTML = '<div class="severity-legend-empty">Все инциденты внеклассовые</div>';
-      return;
+    if (typeof response.json === 'function') {
+      return response.json();
     }
-
-    drawSeverityChart(canvas, counts, total, totalEl);
-    renderSeverityLegend(legendContainer, counts, total);
-  } catch (error) {
-    drawEmptyChart(canvas, totalEl);
-    legendContainer.innerHTML = `<div class="severity-legend-empty">Ошибка при загрузке: ${error.message}</div>`;
   }
+  return response;
 }
-
-function drawEmptyChart(canvas, totalEl) {
-  const ctx = canvas.getContext('2d');
-  const { width, height } = canvas;
-  ctx.clearRect(0, 0, width, height);
-
-  const centerX = width / 2;
-  const centerY = height / 2;
-  const outerRadius = Math.min(width, height) / 2 - 5;
-  const innerRadius = outerRadius * 0.6;
-
-  // Внешний круг светлый
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, outerRadius, 0, Math.PI * 2);
-  ctx.fillStyle = '#e5e9f0';
-  ctx.fill();
-
-  // Дырка
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2);
-  ctx.fillStyle = '#ffffff';
-  ctx.fill();
-
-  totalEl.textContent = '0';
-}
-
-function drawSeverityChart(canvas, counts, total, totalEl) {
-  const ctx = canvas.getContext('2d');
-  const { width, height } = canvas;
-  ctx.clearRect(0, 0, width, height);
-
-  const centerX = width / 2;
-  const centerY = height / 2;
-  const outerRadius = Math.min(width, height) / 2 - 5;
-  const innerRadius = outerRadius * 0.6;
-
-  let startAngle = -Math.PI / 2;
-  appState.severitySlices = [];
-  let normalizedStart = 0;
-
-  for (const sev of SEVERITY_ORDER) {
-    const count = counts[sev];
-    if (!count) continue;
-
-    const sliceAngle = (count / total) * Math.PI * 2;
-    const endAngle = startAngle + sliceAngle;
-
-    // Сегмент
-    ctx.beginPath();
-    ctx.moveTo(centerX, centerY);
-    ctx.arc(centerX, centerY, outerRadius, startAngle, endAngle);
-    ctx.closePath();
-    ctx.fillStyle = SEVERITY_COLORS[sev] || '#ccc';
-    ctx.fill();
-
-    appState.severitySlices.push({
-      severity: sev,
-      start: normalizedStart,
-      end: normalizedStart + sliceAngle,
-    });
-
-    normalizedStart += sliceAngle;
-
-    startAngle = endAngle;
-  }
-
-  // Внутренняя "дыра"
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2);
-  ctx.fillStyle = '#ffffff';
-  ctx.fill();
-
-  totalEl.textContent = total.toString();
-}
-
-function renderSeverityLegend(container, counts, total) {
-  container.innerHTML = '';
-
-  for (const sev of SEVERITY_ORDER) {
-    const count = counts[sev];
-    if (!count) continue;
-
-    const percent = ((count / total) * 100).toFixed(1);
-    const row = document.createElement('div');
-    row.className = 'severity-row';
-
-    row.innerHTML = `
-      <div class="severity-label">
-        <span class="severity-color" style="background-color:${SEVERITY_COLORS[sev]}"></span>
-        <span>${SEVERITY_LABELS[sev] || sev}</span>
-      </div>
-      <div class="severity-bar-wrap">
-        <div class="severity-bar" style="width:${percent}%"></div>
-      </div>
-      <div class="severity-count">${count}</div>
-    `;
-
-    row.dataset.severity = sev;
-    row.classList.add('severity-row-clickable');
-    row.addEventListener('click', () => {
-      navigateToIncidents(sev);
-    });
-
-    container.appendChild(row);
-  }
-}
-
-/**
- * ==== ФУНКЦИИ ВЗАИМОДЕЙСТВИЯ С БЭКЕНДОМ ====
- */
 
 async function loadEvents() {
   showOutput('Загрузка событий...');
   try {
     const data = await apiCall(`${API_BASE}/api/events/?limit=50&offset=0`);
-
     if (!Array.isArray(data) || data.length === 0) {
       showOutput('События загружены: данных нет.');
       return;
     }
-
     showOutput(
       `События загружены (${data.length} шт.):\n\n` +
       JSON.stringify(data, null, 2)
@@ -483,16 +72,13 @@ async function runAnalysis() {
       `${API_BASE}/api/analyze/run?since_minutes=60`,
       { method: 'POST' }
     );
-
     const incidentsFound = data?.incidents_found ?? 0;
-
     showOutput(
       `Анализ завершён.\nИнцидентов найдено: ${incidentsFound}\n\n` +
       JSON.stringify(data, null, 2)
     );
-
-    await refreshIncidents({ silent: true });
-    await renderCurrentRoute({ silent: true });
+    await checkNewIncidents();
+    await loadIncidentsAndChart();
   } catch (error) {
     showOutput(`Ошибка при запуске анализа:\n${error.message}`);
   }
@@ -505,269 +91,341 @@ async function collectFileEvents() {
       `${API_BASE}/api/collect/file?file_path=./logs/system.log&max_lines=200`,
       { method: 'POST' }
     );
-
     const collected = data?.collected_count ?? 0;
     const saved = data?.saved_count ?? 0;
-
     if (collected === 0) {
       showOutput('В файле логов нет новых событий.');
       return;
     }
-
     showOutput(
-      `События собраны.\nСохранено: ${saved}\n\nЗагрузка инцидентов...`
+      `События собраны.\nСохранено: ${saved}\n\nЗагрузка событий...`
     );
-
-    await runAnalysis();
+    await loadEvents();
+    await checkNewIncidents();
+    await loadIncidentsAndChart();
   } catch (error) {
     showOutput(`Ошибка при сборе событий:\n${error.message}`);
   }
 }
 
-// Новая функция для загрузки инцидентов напрямую
-async function loadIncidents() {
-  showOutput('Загрузка инцидентов...');
+function showNewIncidentToast(incident) {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const description = toRussianDescription(incident);
+  const msg = `Обнаружен новый инцидент: ${description}`;
+  const toast = document.createElement('div');
+  toast.className = 'toast toast-new-incident';
+  toast.setAttribute('role', 'alert');
+  toast.textContent = msg;
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('toast-visible'));
+  setTimeout(() => {
+    toast.classList.remove('toast-visible');
+    setTimeout(() => toast.remove(), 300);
+  }, 6000);
+}
+
+async function fetchIncidents() {
+  const data = await apiCall(`${API_BASE}/api/incidents/?limit=500&offset=0`);
+  return Array.isArray(data) ? data : [];
+}
+
+async function loadEventsHistory() {
+  const listEl = document.getElementById('eventsHistory');
+  if (!listEl) return;
   try {
-    const data = await refreshIncidents();
-
+    const data = await apiCall(`${API_BASE}/api/events/?limit=20&offset=0`);
+    listEl.innerHTML = '';
     if (!Array.isArray(data) || data.length === 0) {
-      showOutput('Инциденты загружены: данных нет.');
+      listEl.innerHTML = '<div class="history-empty">Событий нет</div>';
       return;
     }
-
-    showOutput(
-      `Инциденты загружены (${data.length} шт.):\n\n` +
-      JSON.stringify(data, null, 2)
-    );
-  } catch (error) {
-    showOutput(`Ошибка при загрузке инцидентов:\n${error.message}`);
+    for (const ev of data) {
+      const dt = ev.ts ? new Date(ev.ts) : null;
+      const timeStr = dt ? dt.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'medium' }) : '—';
+      const title = `${ev.event_type || ''} [${ev.severity || ''}]`.trim();
+      const meta = `${timeStr} · ${ev.source_category || ''} · ${ev.source_os || ''}`;
+      const item = document.createElement('div');
+      item.className = 'history-item';
+      item.innerHTML = `<div class="history-item-title">${escapeHtml(title || 'Событие')}</div><div class="history-item-meta">${escapeHtml(meta)}</div>`;
+      listEl.appendChild(item);
+    }
+  } catch (_) {
+    listEl.innerHTML = '<div class="history-empty">Не удалось загрузить события</div>';
   }
 }
 
-function renderIncidentsTable(incidents) {
-  const tbody = document.getElementById('incidentsTbody');
-  if (!tbody) return;
-
-  tbody.textContent = '';
-
-  for (const incident of incidents) {
-    const tr = document.createElement('tr');
-
-    const parts = formatDateTimeParts(incident?.detected_at);
-    const typeCode = incident?.incident_type || '';
-    const type = INCIDENT_TYPE_LABELS[typeCode] || typeCode || '-';
-    const place = getIncidentPlace(incident?.details);
-    const desc = incident?.friendly_description || incident?.description || '-';
-
-    const tdDate = document.createElement('td');
-    tdDate.textContent = parts.date;
-    tr.appendChild(tdDate);
-
-    const tdTime = document.createElement('td');
-    tdTime.textContent = parts.time;
-    tr.appendChild(tdTime);
-
-    const tdType = document.createElement('td');
-    tdType.textContent = type;
-    tr.appendChild(tdType);
-
-    const tdPlace = document.createElement('td');
-    tdPlace.textContent = place;
-    tr.appendChild(tdPlace);
-
-    const tdDesc = document.createElement('td');
-    tdDesc.textContent = desc;
-    tr.appendChild(tdDesc);
-
-    const tdActions = document.createElement('td');
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'details-btn';
-    btn.textContent = 'Детали';
-    btn.addEventListener('click', () => {
-      openIncidentModal(incident);
-    });
-    tdActions.appendChild(btn);
-    tr.appendChild(tdActions);
-
-    tbody.appendChild(tr);
+async function loadNotificationsHistory() {
+  const listEl = document.getElementById('notificationsHistory');
+  if (!listEl) return;
+  try {
+    const data = await apiCall(`${API_BASE}/api/notifications/?limit=20&offset=0`);
+    listEl.innerHTML = '';
+    if (!Array.isArray(data) || data.length === 0) {
+      listEl.innerHTML = '<div class="history-empty">Уведомлений нет</div>';
+      return;
+    }
+    for (const n of data) {
+      const dt = n.created_at ? new Date(n.created_at) : null;
+      const timeStr = dt ? dt.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'medium' }) : '—';
+      const title = n.title || 'Уведомление';
+      const metaParts = [];
+      if (n.severity) metaParts.push(n.severity);
+      if (n.notification_type) metaParts.push(n.notification_type);
+      metaParts.push(timeStr);
+      const meta = metaParts.join(' · ');
+      const item = document.createElement('div');
+      item.className = 'history-item';
+      item.innerHTML = `<div class="history-item-title">${escapeHtml(title)}</div><div class="history-item-meta">${escapeHtml(meta)}</div>`;
+      listEl.appendChild(item);
+    }
+  } catch (_) {
+    listEl.innerHTML = '<div class="history-empty">Не удалось загрузить уведомления</div>';
   }
 }
 
-async function renderIncidentsView(route, options = {}) {
-  const titleEl = document.getElementById('incidentsTitle');
-  const subtitleEl = document.getElementById('incidentsSubtitle');
-  const statusEl = document.getElementById('incidentsStatus');
-  const emptyEl = document.getElementById('incidentsEmpty');
-  const tableWrap = document.querySelector('.incidents-table-wrap');
-
-  if (!titleEl || !subtitleEl || !statusEl || !emptyEl) {
-    return;
-  }
-
-  const sev = (route?.severity || '').toLowerCase();
-  const isAll = !sev || sev === 'all';
-
-  titleEl.textContent = isAll ? 'Инциденты' : `Инциденты: ${SEVERITY_LABELS[sev] || sev}`;
-  subtitleEl.textContent = isAll ? 'Все категории' : `Категория: ${SEVERITY_LABELS[sev] || sev}`;
-
-  if (!options.silent) {
-    statusEl.textContent = appState.incidentsLoading ? 'Загрузка...' : '';
-  } else {
-    statusEl.textContent = '';
-  }
-
-  if (!appState.incidentsLastUpdatedAt) {
-    if (!options.silent) {
-      statusEl.textContent = 'Загрузка...';
-    }
-    await refreshIncidents({ silent: !!options.silent });
-    if (!options.silent) {
-      statusEl.textContent = '';
-    }
-  }
-
-  if (appState.incidentsError && !options.silent) {
-    statusEl.textContent = `Ошибка загрузки: ${appState.incidentsError.message}`;
-  }
-
-  const filtered = (appState.incidents || []).filter((incident) => {
-    if (isAll) return true;
-    return (incident?.severity || '').toLowerCase() === sev;
-  });
-
-  filtered.sort((a, b) => {
-    const ta = Date.parse(a?.detected_at || '') || 0;
-    const tb = Date.parse(b?.detected_at || '') || 0;
-    return tb - ta;
-  });
-
-  const showList = (route?.mode || '') === 'list';
-  if (tableWrap) {
-    tableWrap.hidden = !showList;
-  }
-
-  if (!showList) {
-    emptyEl.hidden = true;
-    statusEl.textContent = `Найдено инцидентов: ${filtered.length}. Нажмите «Подробнее», чтобы открыть список.`;
-    renderIncidentsTable([]);
-    return;
-  }
-
-  statusEl.textContent = '';
-  emptyEl.hidden = filtered.length !== 0;
-  renderIncidentsTable(filtered);
+async function loadHistory() {
+  await Promise.all([loadEventsHistory(), loadNotificationsHistory()]);
 }
 
-function setupSeverityChartClick() {
-  const canvas = document.getElementById('severityChart');
-  if (!canvas) return;
-
-  canvas.addEventListener('click', (e) => {
-    if (!appState.severitySlices || appState.severitySlices.length === 0) {
-      return;
-    }
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const dx = x - centerX;
-    const dy = y - centerY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    const outerRadius = Math.min(rect.width, rect.height) / 2 - 5;
-    const innerRadius = outerRadius * 0.6;
-
-    if (distance < innerRadius || distance > outerRadius) {
-      return;
-    }
-
-    const rawAngle = Math.atan2(dy, dx);
-    let normalized = rawAngle + Math.PI / 2;
-    if (normalized < 0) {
-      normalized += Math.PI * 2;
-    }
-
-    for (const slice of appState.severitySlices) {
-      if (normalized >= slice.start && normalized < slice.end) {
-        navigateToIncidents(slice.severity);
-        return;
+async function checkNewIncidents() {
+  try {
+    const list = await fetchIncidents();
+    let changed = false;
+    for (const inc of list) {
+      const id = inc.id;
+      if (id != null && !seenIncidentIds.has(id)) {
+        seenIncidentIds.add(id);
+        changed = true;
+        showNewIncidentToast(inc);
       }
     }
+    if (changed) saveSeenIncidentIds();
+  } catch (_) {}
+}
+
+function severityOrder(s) {
+  const order = { critical: 0, high: 1, medium: 2, low: 3, warning: 4 };
+  return order[s] ?? 5;
+}
+
+function buildSeverityCounts(incidents) {
+  const counts = {};
+  for (const inc of incidents) {
+    const s = inc.severity || 'unknown';
+    counts[s] = (counts[s] || 0) + 1;
+  }
+  const entries = Object.entries(counts);
+  entries.sort((a, b) => severityOrder(a[0]) - severityOrder(b[0]));
+  return entries;
+}
+
+const SEVERITY_COLORS = {
+  critical: '#e74c3c',
+  high: '#e67e22',
+  medium: '#f1c40f',
+  low: '#2ecc71',
+  warning: '#9b59b6',
+  unknown: '#95a5a6'
+};
+
+const SEVERITY_LABELS = {
+  critical: 'Критический',
+  high: 'Высокий',
+  medium: 'Средний',
+  low: 'Низкий',
+  warning: 'Предупреждение',
+  unknown: 'Неизвестно'
+};
+
+function renderSeverityChart(counts) {
+  const container = document.getElementById('chartContainer');
+  if (!container) return;
+  container.innerHTML = '';
+  if (counts.length === 0) {
+    container.innerHTML = '<p class="chart-empty">Нет инцидентов для отображения.</p>';
+    return;
+  }
+  const total = counts.reduce((s, [, n]) => s + n, 0);
+  const size = 280;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  canvas.className = 'pie-canvas';
+  canvas.setAttribute('role', 'img');
+  canvas.setAttribute('aria-label', 'Круговая диаграмма инцидентов по серьёзности');
+
+  const ctx = canvas.getContext('2d');
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = Math.min(cx, cy) - 8;
+  let startAngle = -Math.PI / 2;
+
+  const segments = [];
+  for (const [severity, count] of counts) {
+    const ratio = count / total;
+    const sweep = ratio * 2 * Math.PI;
+    const endAngle = startAngle + sweep;
+    segments.push({ severity, startAngle, endAngle, count });
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, startAngle, endAngle);
+    ctx.closePath();
+    ctx.fillStyle = SEVERITY_COLORS[severity] || SEVERITY_COLORS.unknown;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    startAngle = endAngle;
+  }
+
+  function getSegmentAt(angle) {
+    const norm = (a) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    const clickNorm = norm(angle + Math.PI / 2);
+    for (const seg of segments) {
+      const s = norm(seg.startAngle + Math.PI / 2);
+      const e = norm(seg.endAngle + Math.PI / 2);
+      if (s <= e && clickNorm >= s && clickNorm < e) return seg;
+      if (s > e && (clickNorm >= s || clickNorm < e)) return seg;
+    }
+    return null;
+  }
+
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left - cx;
+    const y = e.clientY - rect.top - cy;
+    const d = Math.sqrt(x * x + y * y);
+    if (d > r) return;
+    const angle = Math.atan2(y, x);
+    const seg = getSegmentAt(angle);
+    if (seg) openDrilldown(seg.severity);
   });
+
+  canvas.style.cursor = 'pointer';
+  container.appendChild(canvas);
+
+  const legend = document.createElement('div');
+  legend.className = 'pie-legend';
+  for (const [severity, count] of counts) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'pie-legend-item';
+    item.setAttribute('data-severity', severity);
+    item.innerHTML = `<span class="pie-legend-dot" style="background:${SEVERITY_COLORS[severity] || SEVERITY_COLORS.unknown}"></span><span>${SEVERITY_LABELS[severity] || severity}: ${count}</span>`;
+    item.addEventListener('click', () => openDrilldown(severity));
+    legend.appendChild(item);
+  }
+  container.appendChild(legend);
+}
+
+function openDrilldown(severity) {
+  const mainView = document.getElementById('mainView');
+  const detailView = document.getElementById('detailView');
+  const titleEl = document.getElementById('drilldownTitle');
+  titleEl.textContent = `Подробное описание инцидентов: ${SEVERITY_LABELS[severity] || severity}`;
+  const filtered = allIncidents
+    .filter((inc) => (inc.severity || 'unknown') === severity)
+    .sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at));
+  renderDrilldownList(filtered);
+  if (mainView) mainView.classList.add('hidden');
+  if (detailView) detailView.classList.remove('hidden');
+}
+
+function backToChart() {
+  const mainView = document.getElementById('mainView');
+  const detailView = document.getElementById('detailView');
+  if (mainView) mainView.classList.remove('hidden');
+  if (detailView) detailView.classList.add('hidden');
+}
+
+function toRussianDescription(incident) {
+  const t = incident.incident_type || '';
+  if (t === 'multiple_failed_logins') {
+    return 'множественные неуспешные попытки входа';
+  }
+  if (t === 'repeated_network_errors') {
+    const count = incident.details && incident.details.events_count ? incident.details.events_count : null;
+    const windowMin = incident.details && incident.details.window_minutes ? incident.details.window_minutes : 60;
+    if (count != null) {
+      return `повторяющиеся сетевые ошибки: ${count} событий за последние ${windowMin} минут`;
+    }
+    return 'повторяющиеся сетевые ошибки';
+  }
+  if (t === 'service_crash_or_restart') {
+    const svc = incident.details && (incident.details.service || incident.details.process || incident.details.program);
+    if (svc) {
+      return `сбой или перезапуск службы ${svc}`;
+    }
+    return 'сбой или перезапуск службы';
+  }
+  return incident.description || 'инцидент безопасности';
+}
+
+function renderDrilldownList(incidents) {
+  const listEl = document.getElementById('drilldownList');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+  if (incidents.length === 0) {
+    listEl.innerHTML = '<p class="drilldown-empty">Нет инцидентов в этой категории.</p>';
+    return;
+  }
+  const header = document.createElement('div');
+  header.className = 'drilldown-row drilldown-row-header';
+  header.innerHTML = '<div class="drilldown-row-desc">Описание ошибки</div><div class="drilldown-row-program">Приложение/служба</div><div class="drilldown-row-time-h">Время обнаружения</div>';
+  listEl.appendChild(header);
+  for (const inc of incidents) {
+    const dt = inc.detected_at ? new Date(inc.detected_at) : null;
+    const timeStr = dt ? dt.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'medium' }) : '—';
+    const program =
+      (inc.details && (inc.details.service || inc.details.process || inc.details.program)) ||
+      inc.incident_type ||
+      '—';
+    const description = toRussianDescription(inc);
+    const row = document.createElement('div');
+    row.className = 'drilldown-row';
+    row.innerHTML = `
+      <div class="drilldown-row-desc">${escapeHtml(description)}</div>
+      <div class="drilldown-row-program">${escapeHtml(program)}</div>
+      <div class="drilldown-row-time-h">${escapeHtml(timeStr)}</div>
+    `;
+    listEl.appendChild(row);
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+async function loadIncidentsAndChart() {
+  try {
+    allIncidents = await fetchIncidents();
+    const counts = buildSeverityCounts(allIncidents);
+    renderSeverityChart(counts);
+    await loadHistory();
+  } catch (_) {
+    const container = document.getElementById('chartContainer');
+    if (container) container.innerHTML = '<p class="chart-empty">Не удалось загрузить инциденты.</p>';
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const loadEventsBtn = document.getElementById('loadEventsBtn');
-  if (loadEventsBtn) {
-    loadEventsBtn.addEventListener('click', async () => {
-      await loadEvents();
-      await loadSeverityOverview(3);
-    });
-  }
+  loadSeenIncidentIds();
+  document.getElementById('loadEventsBtn').addEventListener('click', loadEvents);
+  document.getElementById('runAnalysisBtn').addEventListener('click', runAnalysis);
+  document.getElementById('generateMockBtn').addEventListener('click', collectFileEvents);
+  document.getElementById('backToChartBtn').addEventListener('click', backToChart);
 
-  const runAnalysisBtn = document.getElementById('runAnalysisBtn');
-  if (runAnalysisBtn) {
-    runAnalysisBtn.addEventListener('click', runAnalysis);
-  }
+  loadIncidentsAndChart();
+  checkNewIncidents();
 
-  const collectBtn = document.getElementById('generateMockBtn');
-  if (collectBtn) {
-    collectBtn.addEventListener('click', collectFileEvents);
-  }
-
-  const loadIncidentsBtn = document.getElementById('loadIncidentsBtn');
-  if (loadIncidentsBtn) {
-    loadIncidentsBtn.addEventListener('click', () => {
-      navigateToIncidents('all');
-    });
-  }
-
-  const backBtn = document.getElementById('backToDashboardBtn');
-  if (backBtn) {
-    backBtn.addEventListener('click', () => {
-      navigateToDashboard();
-    });
-  }
-
-  const showListBtn = document.getElementById('showIncidentsListBtn');
-  if (showListBtn) {
-    showListBtn.addEventListener('click', () => {
-      const route = getRoute();
-      navigateToIncidentsList(route.severity || 'all');
-    });
-  }
-
-  const modalCloseBtn = document.getElementById('incidentModalCloseBtn');
-  if (modalCloseBtn) {
-    modalCloseBtn.addEventListener('click', closeIncidentModal);
-  }
-
-  const modalBackdrop = document.getElementById('incidentModalBackdrop');
-  if (modalBackdrop) {
-    modalBackdrop.addEventListener('click', closeIncidentModal);
-  }
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      closeIncidentModal();
-    }
-  });
-
-  setupSeverityChartClick();
-
-  window.addEventListener('hashchange', () => {
-    renderCurrentRoute({ silent: false }).catch(() => {});
-  });
-
-  if (!window.location.hash) {
-    navigateToDashboard();
-  }
-
-  refreshIncidents({ silent: true }).catch(() => {});
-  renderCurrentRoute({ silent: false }).catch(() => {});
-  startIncidentsPolling();
+  setInterval(async () => {
+    try {
+      await apiCall(`${API_BASE}/api/analyze/run?since_minutes=60`, { method: 'POST' });
+    } catch (_) {}
+    checkNewIncidents();
+    loadIncidentsAndChart();
+  }, POLL_INTERVAL_MS);
 });

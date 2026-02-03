@@ -12,123 +12,52 @@
       <h1>Система мониторинга SIEM</h1>
     </header>
 
-    <main>
-      <section id="view-dashboard">
-        <section class="dashboard">
-          <div class="syslog-card">
-            <div class="syslog-header">
-              <div>
-                <h2>Инциденты по серьёзности</h2>
-                <div class="syslog-period" id="severityPeriod">за последние 3 дня</div>
-              </div>
-            </div>
+    <div id="mainView" class="view">
+      <main>
+        <div class="controls">
+          <button id="loadEventsBtn">Загрузить события</button>
+          <button id="runAnalysisBtn">Запустить анализ</button>
+          <button id="generateMockBtn">Собрать события из файла</button>
+        </div>
 
-            <div class="syslog-body">
-              <div class="syslog-chart-wrap">
-                <canvas id="severityChart" width="260" height="260"></canvas>
-                <div class="syslog-total" id="severityTotal">0</div>
-              </div>
-              <div class="syslog-legend" id="severityLegend">
-                <!-- легенда заполняется из JS -->
-              </div>
-            </div>
-          </div>
+        <section id="dashboardSection" class="dashboard-section">
+          <h2>Инциденты по серьёзности</h2>
+          <p class="section-hint">Данные обновляются каждые 10 секунд. Нажмите на сектор диаграммы или пункт легенды, чтобы открыть список инцидентов с описанием ошибки, программой и временем обнаружения.</p>
+          <div id="chartContainer" class="chart-container"></div>
         </section>
 
-        <section class="controls-section">
-          <div class="controls">
-            <button id="loadEventsBtn">Загрузить события</button>
-            <button id="runAnalysisBtn">Запустить анализ</button>
-            <button id="generateMockBtn">Собрать события из файла</button>
-            <button id="loadIncidentsBtn">Загрузить инциденты</button>
-          </div>
-        </section>
-
-        <section class="output">
+        <div class="output">
           <h2>Результат</h2>
           <pre id="outputArea">Нажмите кнопку выше для взаимодействия с backend.</pre>
+        </div>
+
+        <section class="history-section">
+          <h2>История событий и уведомлений</h2>
+          <div class="history-columns">
+            <div class="history-block">
+              <h3>События</h3>
+              <div id="eventsHistory" class="history-list"></div>
+            </div>
+            <div class="history-block">
+              <h3>Уведомления</h3>
+              <div id="notificationsHistory" class="history-list"></div>
+            </div>
+          </div>
         </section>
-      </section>
+      </main>
+    </div>
 
-      <section id="view-incidents" class="incidents-view" hidden>
-        <div class="incidents-header">
-          <button id="backToDashboardBtn" class="back-btn" type="button">Назад</button>
-          <div>
-            <h2 id="incidentsTitle">Инциденты</h2>
-            <div id="incidentsSubtitle" class="incidents-subtitle"></div>
-          </div>
-          <div class="incidents-header-actions">
-            <button id="showIncidentsListBtn" class="details-btn" type="button">Подробнее</button>
-          </div>
+    <div id="detailView" class="view hidden">
+      <main class="detail-page">
+        <div class="detail-header">
+          <button id="backToChartBtn" type="button" class="btn-back">← Вернуться к графику</button>
+          <h2 id="drilldownTitle">Подробное описание инцидентов</h2>
         </div>
+        <div id="drilldownList" class="drilldown-list"></div>
+      </main>
+    </div>
 
-        <div id="incidentsStatus" class="incidents-status"></div>
-
-        <div class="incidents-table-wrap">
-          <table class="incidents-table">
-            <thead>
-              <tr>
-                <th>Дата</th>
-                <th>Время</th>
-                <th>Тип</th>
-                <th>Приложение/служба</th>
-                <th>Описание</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="incidentsTbody"></tbody>
-          </table>
-        </div>
-
-        <div id="incidentsEmpty" class="incidents-empty" hidden>Нет инцидентов по выбранной категории</div>
-      </section>
-
-      <div id="incidentModal" class="modal" hidden>
-        <div class="modal-backdrop" id="incidentModalBackdrop"></div>
-        <div class="modal-dialog" role="dialog" aria-modal="true">
-          <div class="modal-header">
-            <div>
-              <div class="modal-title" id="incidentModalTitle">Инцидент</div>
-              <div class="modal-subtitle" id="incidentModalSubtitle"></div>
-            </div>
-            <button id="incidentModalCloseBtn" class="modal-close" type="button">Закрыть</button>
-          </div>
-          <div class="modal-body">
-            <div class="modal-grid">
-              <div class="modal-field">
-                <div class="modal-label">Дата</div>
-                <div class="modal-value" id="incidentModalDate">-</div>
-              </div>
-              <div class="modal-field">
-                <div class="modal-label">Время</div>
-                <div class="modal-value" id="incidentModalTime">-</div>
-              </div>
-              <div class="modal-field">
-                <div class="modal-label">Серьёзность</div>
-                <div class="modal-value" id="incidentModalSeverity">-</div>
-              </div>
-              <div class="modal-field">
-                <div class="modal-label">Тип</div>
-                <div class="modal-value" id="incidentModalType">-</div>
-              </div>
-              <div class="modal-field modal-field-wide">
-                <div class="modal-label">Приложение/служба</div>
-                <div class="modal-value" id="incidentModalPlace">-</div>
-              </div>
-              <div class="modal-field modal-field-wide">
-                <div class="modal-label">Описание</div>
-                <div class="modal-value" id="incidentModalDescription">-</div>
-              </div>
-            </div>
-
-            <div class="modal-section">
-              <div class="modal-label">Детали (JSON)</div>
-              <pre class="modal-json" id="incidentModalDetails">{}</pre>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
+    <div id="toastContainer" class="toast-container" aria-live="polite"></div>
   </div>
 
   <script src="renderer.js"></script>

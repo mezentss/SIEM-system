@@ -7,10 +7,22 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="topbar-title">Система мониторинга SIEM</div>
+      <nav class="topbar-nav" aria-label="Навигация">
+        <button class="topbar-nav-item topbar-nav-item-active" type="button">Панель</button>
+        <button class="topbar-nav-item" type="button" disabled>Отчёты</button>
+        <button class="topbar-nav-item" type="button" disabled>Настройки</button>
+      </nav>
+      <div class="topbar-user">
+        <span class="topbar-user-label">Пользователь:</span>
+        <span class="topbar-user-name">Администратор</span>
+      </div>
+    </div>
+  </div>
+
   <div class="container">
-    <header>
-      <h1>Система мониторинга SIEM</h1>
-    </header>
 
     <div id="mainView" class="view">
       <main>
@@ -20,40 +32,112 @@
           <button id="generateMockBtn">Собрать события из файла</button>
         </div>
 
-        <section id="dashboardSection" class="dashboard-section">
-          <h2>Инциденты по серьёзности</h2>
-          <p class="section-hint">Данные обновляются каждые 10 секунд. Нажмите на сектор диаграммы или пункт легенды, чтобы открыть список инцидентов с описанием ошибки, программой и временем обнаружения.</p>
-          <div id="chartContainer" class="chart-container"></div>
+        <section class="stats-grid" aria-label="Ключевые показатели">
+          <div class="stat-card">
+            <div class="stat-label">Событий всего</div>
+            <div id="statTotalEvents" class="stat-value">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Активных инцидентов</div>
+            <div id="statActiveIncidents" class="stat-value">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Инцидентов сегодня</div>
+            <div id="statAlertsToday" class="stat-value">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Состояние системы</div>
+            <div id="statSystemHealth" class="stat-value stat-health">—</div>
+          </div>
         </section>
 
-        <div class="output">
-          <h2>Результат</h2>
-          <pre id="outputArea">Нажмите кнопку выше для взаимодействия с backend.</pre>
-        </div>
+        <section class="panel-grid" aria-label="Панель мониторинга">
+          <section id="dashboardSection" class="panel">
+            <div class="panel-header">
+              <h2>Инциденты по серьёзности</h2>
+            </div>
+            <p class="section-hint">Данные обновляются каждые 10 секунд. Нажмите на сектор диаграммы или пункт легенды, чтобы открыть список инцидентов с описанием ошибки, приложением и временем обнаружения.</p>
+            <div id="chartContainer" class="chart-container"></div>
+          </section>
 
-        <section class="history-section">
-          <h2>История событий и уведомлений</h2>
-          <div class="history-columns">
-            <div class="history-block">
-              <h3>События</h3>
-              <div id="eventsHistory" class="history-list"></div>
+          <section class="panel">
+            <div class="panel-header">
+              <h2>События по уровням за последние 24 часа</h2>
             </div>
-            <div class="history-block">
-              <h3>Уведомления</h3>
-              <div id="notificationsHistory" class="history-list"></div>
+            <canvas id="eventsByHourChart" width="800" height="260"></canvas>
+            <div class="events-chart-legend">
+              <span class="legend-dot legend-critical"></span><span>Критическая</span>
+              <span class="legend-dot legend-high"></span><span>Высокая</span>
+              <span class="legend-dot legend-medium"></span><span>Средняя</span>
+              <span class="legend-dot legend-low"></span><span>Низкая</span>
             </div>
+          </section>
+        </section>
+
+        <section class="panel-grid panel-grid-bottom" aria-label="История и журнал">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Последние события</h2>
+            </div>
+            <div id="eventsHistory" class="history-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Уведомления</h2>
+            </div>
+            <div id="notificationsHistory" class="history-list"></div>
+          </section>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Журнал операций</h2>
           </div>
+          <pre id="outputArea" class="output-area">Нажмите кнопку выше для взаимодействия с сервером.</pre>
         </section>
       </main>
     </div>
 
-    <div id="detailView" class="view hidden">
+    <div id="detailView" class="detail-overlay hidden" aria-hidden="true">
       <main class="detail-page">
-        <div class="detail-header">
-          <button id="backToChartBtn" type="button" class="btn-back">← Вернуться к графику</button>
-          <h2 id="drilldownTitle">Подробное описание инцидентов</h2>
+        <div class="detail-top">
+          <button id="backToChartBtn" type="button" class="btn-back">← Назад к панели</button>
+          <div class="detail-breadcrumbs" id="detailBreadcrumbs">Панель / Инциденты</div>
         </div>
-        <div id="drilldownList" class="drilldown-list"></div>
+
+        <div class="detail-title-row">
+          <h2 id="drilldownTitle" class="detail-title">Инциденты</h2>
+          <div class="detail-search">
+            <input id="detailSearchInput" type="search" placeholder="Поиск по описанию или службе" />
+          </div>
+        </div>
+
+        <div class="detail-tabs" role="tablist" aria-label="Фильтр по серьёзности">
+          <button id="tabCritical" class="detail-tab" type="button" data-severity="critical">Критические</button>
+          <button id="tabHigh" class="detail-tab" type="button" data-severity="high">Высокие</button>
+          <button id="tabMedium" class="detail-tab" type="button" data-severity="medium">Средние</button>
+          <button id="tabLow" class="detail-tab" type="button" data-severity="low">Низкие</button>
+        </div>
+
+        <section class="panel detail-panel">
+          <div class="detail-table-wrap">
+            <table class="detail-table">
+              <thead>
+                <tr>
+                  <th>Дата</th>
+                  <th>Время</th>
+                  <th>Тип</th>
+                  <th>Серьёзность</th>
+                  <th>Приложение/служба</th>
+                  <th>Описание</th>
+                </tr>
+              </thead>
+              <tbody id="drilldownList"></tbody>
+            </table>
+          </div>
+          <div id="drilldownEmpty" class="drilldown-empty hidden">Нет инцидентов в этой категории.</div>
+        </section>
       </main>
     </div>
 

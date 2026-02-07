@@ -30,11 +30,16 @@ class FileLogCollector(LogCollector):
         events: List[NormalizedEvent] = []
         for line in selected:
             ts, msg = self._parse_line(line)
+            proc_name = self._extract_process_name(line, msg)
             raw_data: Dict[str, Any] = {
                 "source": "file",
                 "file_path": str(path),
                 "raw_line": line,
             }
+            if proc_name:
+                raw_data["process"] = proc_name
+                raw_data["service"] = proc_name
+                raw_data["application"] = proc_name
 
             event_type = EventClassifier.classify_event_type(msg, raw_data)
             source_category = EventClassifier.classify_source_category(msg, raw_data, "macos")
@@ -53,6 +58,46 @@ class FileLogCollector(LogCollector):
             )
 
         return events
+
+    def _extract_process_name(self, raw_line: str, msg: str) -> str:
+        def is_meaningful(value: str) -> bool:
+            v = (value or "").strip()
+            if not v:
+                return False
+            if v.isdigit():
+                return False
+            return re.search(r"[A-Za-zА-Яа-я]", v) is not None
+
+        text = raw_line or msg or ""
+
+        # Full syslog line: "Jan 16 12:34:56 host process[pid]: message"
+        m_full = re.match(
+            r"^(?:[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+)?(?P<host>\S+)\s+(?P<proc>[^\s\[]+)(?:\[(?P<pid>\d+)\])?:\s+.*$",
+            text,
+        )
+        if m_full:
+            proc = m_full.group("proc")
+            if is_meaningful(proc):
+                return proc
+
+        # Msg without timestamp: "host process[pid]: message"
+        m_msg = re.match(
+            r"^(?P<host>\S+)\s+(?P<proc>[^\s\[]+)(?:\[(?P<pid>\d+)\])?:\s+.*$",
+            msg or "",
+        )
+        if m_msg:
+            proc = m_msg.group("proc")
+            if is_meaningful(proc):
+                return proc
+
+        # Fallback: "proc[pid]: message" or "proc: message"
+        m_proc = re.match(r"^\s*(?P<proc>[^\s:]+?)(?:\[\d+\])?:\s+.*$", text)
+        if m_proc:
+            proc = m_proc.group("proc")
+            if is_meaningful(proc):
+                return proc
+
+        return ""
 
     def _determine_severity(self, message: str) -> str:
         """Определяет уровень важности на основе сообщения."""

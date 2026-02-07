@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from siem_backend.data.incident_repository import IncidentRepository
-from siem_backend.data.models import Incident
+from siem_backend.data.models import Event, Incident
 from siem_backend.services.analysis.base import BaseRule
 from siem_backend.services.analysis.engine import RuleEngine
 from siem_backend.services.analysis.rules.failed_logins import MultipleFailedLoginsRule
@@ -37,7 +38,15 @@ class IncidentService:
             c for c in candidates
             if c.event_id is None or (c.event_id, c.incident_type) not in existing_pairs
         ]
-        incidents = [self._to_model(c) for c in new_candidates]
+
+        event_by_id: Dict[int, Event] = {}
+        unique_event_ids = sorted({c.event_id for c in new_candidates if c.event_id is not None})
+        if unique_event_ids:
+            stmt = select(Event).where(Event.id.in_(unique_event_ids))
+            events = db.execute(stmt).scalars().all()
+            event_by_id = {e.id: e for e in events if e.id is not None}
+
+        incidents = [self._to_model(c, event_by_id.get(c.event_id or -1)) for c in new_candidates]
         if not incidents:
             return 0
         saved_count = self._repo.add_many(db, incidents)
@@ -57,12 +66,27 @@ class IncidentService:
             ServiceCrashOrRestartRule(),
         ]
 
-    def _to_model(self, candidate) -> Incident:
+    def _to_model(self, candidate, event: Optional[Event] = None) -> Incident:
+        details: Dict[str, Any] = dict(candidate.details or {})
+
+        if event is not None:
+            raw = event.raw_data or {}
+            process = raw.get("process") or ""
+            service = raw.get("service") or ""
+            application = raw.get("application") or ""
+
+            if process:
+                details.setdefault("process", process)
+            if service:
+                details.setdefault("service", service)
+            if application:
+                details.setdefault("application", application)
+
         return Incident(
             detected_at=candidate.detected_at,
             incident_type=candidate.incident_type,
             severity=candidate.severity,
             description=candidate.description,
             event_id=candidate.event_id,
-            details=candidate.details,
+            details=details,
         )

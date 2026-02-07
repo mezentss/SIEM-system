@@ -5,6 +5,8 @@ const POLL_INTERVAL_MS = 10000;
 
 let allIncidents = [];
 let seenIncidentIds = new Set();
+let drilldownSeverity = null;
+let drilldownQuery = '';
 
 function loadSeenIncidentIds() {
   try {
@@ -27,6 +29,51 @@ function saveSeenIncidentIds() {
 function showOutput(text) {
   const outputArea = document.getElementById('outputArea');
   if (outputArea) outputArea.textContent = text;
+}
+
+function formatNumberRu(n) {
+  const num = Number(n);
+  if (!Number.isFinite(num)) return '—';
+  return num.toLocaleString('ru-RU');
+}
+
+function isSameDay(a, b) {
+  const da = new Date(a);
+  const db = new Date(b);
+  return (
+    da.getFullYear() === db.getFullYear() &&
+    da.getMonth() === db.getMonth() &&
+    da.getDate() === db.getDate()
+  );
+}
+
+function updateDashboardStats({ events = [], incidents = [] } = {}) {
+  const totalEventsEl = document.getElementById('statTotalEvents');
+  const activeIncidentsEl = document.getElementById('statActiveIncidents');
+  const alertsTodayEl = document.getElementById('statAlertsToday');
+  const healthEl = document.getElementById('statSystemHealth');
+
+  const totalEvents = Array.isArray(events) ? events.length : 0;
+  const totalIncidents = Array.isArray(incidents) ? incidents.length : 0;
+
+  const now = new Date();
+  const incidentsToday = (Array.isArray(incidents) ? incidents : []).filter((inc) => {
+    const ts = inc?.detected_at;
+    return ts ? isSameDay(ts, now) : false;
+  }).length;
+
+  const hasCritical = (Array.isArray(incidents) ? incidents : []).some(
+    (inc) => (inc?.severity || '').toLowerCase() === 'critical'
+  );
+
+  if (totalEventsEl) totalEventsEl.textContent = formatNumberRu(totalEvents);
+  if (activeIncidentsEl) activeIncidentsEl.textContent = formatNumberRu(totalIncidents);
+  if (alertsTodayEl) alertsTodayEl.textContent = formatNumberRu(incidentsToday);
+
+  if (healthEl) {
+    healthEl.textContent = hasCritical ? 'Требует внимания' : 'Норма';
+    healthEl.style.color = hasCritical ? '#b63c3b' : '#2c3e50';
+  }
 }
 
 async function apiCall(url, options = {}) {
@@ -221,22 +268,121 @@ function buildSeverityCounts(incidents) {
 }
 
 const SEVERITY_COLORS = {
-  critical: '#e74c3c',
-  high: '#e67e22',
-  medium: '#f1c40f',
-  low: '#2ecc71',
-  warning: '#9b59b6',
-  unknown: '#95a5a6'
+  critical: '#b63c3b',   // красный
+  high: '#f9c414',       // жёлтый
+  medium: '#26567a',     // синий
+  low: '#f7ead7',        // светлый
+  warning: '#505050',    // тёмно‑серый
+  unknown: '#4D4D4D'
 };
 
 const SEVERITY_LABELS = {
-  critical: 'Критический',
-  high: 'Высокий',
-  medium: 'Средний',
-  low: 'Низкий',
+  critical: 'Критическая',
+  high: 'Высокая',
+  medium: 'Средняя',
+  low: 'Низкая',
   warning: 'Предупреждение',
   unknown: 'Неизвестно'
 };
+
+function buildEventsByHour(events) {
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const buckets = {};
+  for (const ev of events) {
+    if (!ev.ts) continue;
+    const ts = new Date(ev.ts);
+    if (ts < cutoff) continue;
+    const moscowMs = ts.getTime() + 3 * 60 * 60 * 1000;
+    const moscow = new Date(moscowMs);
+    const label = moscow.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    if (!buckets[label]) {
+      buckets[label] = { critical: 0, high: 0, medium: 0, low: 0 };
+    }
+    const s = ev.severity || 'low';
+    if (s === 'critical' || s === 'high' || s === 'medium' || s === 'low') {
+      buckets[label][s] += 1;
+    }
+  }
+  const labels = Object.keys(buckets).sort((a, b) => {
+    const da = new Date(a);
+    const db = new Date(b);
+    return da - db;
+  });
+  return { labels, buckets };
+}
+
+function renderEventsByHourChart(data) {
+  const canvas = document.getElementById('eventsByHourChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+  ctx.clearRect(0, 0, width, height);
+  const paddingLeft = 50;
+  const paddingBottom = 30;
+  const paddingTop = 10;
+  const plotWidth = width - paddingLeft - 10;
+  const plotHeight = height - paddingTop - paddingBottom;
+  const labels = data.labels;
+  if (!labels.length) {
+    ctx.fillStyle = '#7f8c8d';
+    ctx.font = '12px sans-serif';
+    ctx.fillText('Событий за последние 24 часа нет', paddingLeft, paddingTop + plotHeight / 2);
+    return;
+  }
+  let maxCount = 0;
+  for (const label of labels) {
+    const b = data.buckets[label];
+    const total = b.critical + b.high + b.medium + b.low;
+    if (total > maxCount) maxCount = total;
+  }
+  if (maxCount === 0) maxCount = 1;
+    const barWidth = Math.max(1, plotWidth / (labels.length * 40));
+    const gap = barWidth * 5;
+  ctx.strokeStyle = '#bdc3c7';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(paddingLeft, paddingTop);
+  ctx.lineTo(paddingLeft, paddingTop + plotHeight);
+  ctx.lineTo(paddingLeft + plotWidth, paddingTop + plotHeight);
+  ctx.stroke();
+  ctx.font = '10px sans-serif';
+  ctx.fillStyle = '#7f8c8d';
+  ctx.textAlign = 'center';
+  const step = Math.max(1, Math.floor(labels.length / 6));
+  labels.forEach((label, i) => {
+    if (i % step !== 0 && i !== labels.length - 1) return;
+    const x = paddingLeft + i * (barWidth + gap) + barWidth / 2;
+    const text = label;
+    ctx.save();
+    ctx.translate(x, paddingTop + plotHeight + 12);
+    ctx.rotate(-Math.PI / 4);
+    ctx.fillText(text, 0, 0);
+    ctx.restore();
+  });
+  labels.forEach((label, i) => {
+    const b = data.buckets[label];
+    const x = paddingLeft + i * (barWidth + gap);
+    let y = paddingTop + plotHeight;
+    function drawStack(count, color) {
+      if (!count) return;
+      const h = (count / maxCount) * plotHeight;
+      y -= h;
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, barWidth, h);
+    }
+    drawStack(b.low, SEVERITY_COLORS.low);
+    drawStack(b.medium, SEVERITY_COLORS.medium);
+    drawStack(b.high, SEVERITY_COLORS.high);
+    drawStack(b.critical, SEVERITY_COLORS.critical);
+  });
+}
 
 function renderSeverityChart(counts) {
   const container = document.getElementById('chartContainer');
@@ -254,13 +400,11 @@ function renderSeverityChart(counts) {
   canvas.className = 'pie-canvas';
   canvas.setAttribute('role', 'img');
   canvas.setAttribute('aria-label', 'Круговая диаграмма инцидентов по серьёзности');
-
   const ctx = canvas.getContext('2d');
   const cx = size / 2;
   const cy = size / 2;
   const r = Math.min(cx, cy) - 8;
   let startAngle = -Math.PI / 2;
-
   const segments = [];
   for (const [severity, count] of counts) {
     const ratio = count / total;
@@ -278,7 +422,6 @@ function renderSeverityChart(counts) {
     ctx.stroke();
     startAngle = endAngle;
   }
-
   function getSegmentAt(angle) {
     const norm = (a) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
     const clickNorm = norm(angle + Math.PI / 2);
@@ -290,7 +433,6 @@ function renderSeverityChart(counts) {
     }
     return null;
   }
-
   canvas.addEventListener('click', (e) => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left - cx;
@@ -301,10 +443,8 @@ function renderSeverityChart(counts) {
     const seg = getSegmentAt(angle);
     if (seg) openDrilldown(seg.severity);
   });
-
   canvas.style.cursor = 'pointer';
   container.appendChild(canvas);
-
   const legend = document.createElement('div');
   legend.className = 'pie-legend';
   for (const [severity, count] of counts) {
@@ -323,73 +463,157 @@ function openDrilldown(severity) {
   const mainView = document.getElementById('mainView');
   const detailView = document.getElementById('detailView');
   const titleEl = document.getElementById('drilldownTitle');
-  titleEl.textContent = `Подробное описание инцидентов: ${SEVERITY_LABELS[severity] || severity}`;
-  const filtered = allIncidents
-    .filter((inc) => (inc.severity || 'unknown') === severity)
-    .sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at));
-  renderDrilldownList(filtered);
+  const breadcrumbs = document.getElementById('detailBreadcrumbs');
+
+  drilldownSeverity = severity;
+  drilldownQuery = '';
+
+  const label = SEVERITY_LABELS[severity] || severity;
+  if (titleEl) titleEl.textContent = `Инциденты: ${label}`;
+  if (breadcrumbs) breadcrumbs.textContent = `Панель / Инциденты / ${label}`;
+
+  const searchEl = document.getElementById('detailSearchInput');
+  if (searchEl) searchEl.value = '';
+
+  renderDrilldown();
+
   if (mainView) mainView.classList.add('hidden');
-  if (detailView) detailView.classList.remove('hidden');
+  if (detailView) {
+    detailView.classList.remove('hidden');
+    detailView.setAttribute('aria-hidden', 'false');
+  }
 }
 
 function backToChart() {
   const mainView = document.getElementById('mainView');
   const detailView = document.getElementById('detailView');
   if (mainView) mainView.classList.remove('hidden');
-  if (detailView) detailView.classList.add('hidden');
+  if (detailView) {
+    detailView.classList.add('hidden');
+    detailView.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function setActiveDetailTab(severity) {
+  const tabs = document.querySelectorAll('.detail-tab');
+  for (const t of tabs) {
+    const s = (t.getAttribute('data-severity') || '').toLowerCase();
+    if (s === severity) {
+      t.classList.add('detail-tab-active');
+      t.setAttribute('aria-selected', 'true');
+    } else {
+      t.classList.remove('detail-tab-active');
+      t.setAttribute('aria-selected', 'false');
+    }
+  }
+}
+
+function incidentMatchesQuery(inc, query) {
+  const q = (query || '').trim().toLowerCase();
+  if (!q) return true;
+  const details = inc?.details || {};
+  const service =
+    details.service ||
+    details.process ||
+    details.program ||
+    details.application ||
+    '';
+  const text = [
+    toRussianDescription(inc),
+    inc?.description || '',
+    inc?.friendly_description || '',
+    String(service || ''),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return text.includes(q);
+}
+
+function renderDrilldown() {
+  const severity = drilldownSeverity || 'unknown';
+  setActiveDetailTab(severity);
+
+  const filtered = allIncidents
+    .filter((inc) => (inc.severity || 'unknown') === severity)
+    .filter((inc) => incidentMatchesQuery(inc, drilldownQuery))
+    .sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at));
+
+  renderDrilldownList(filtered);
 }
 
 function toRussianDescription(incident) {
   const t = incident.incident_type || '';
+  const details = incident.details || {};
   if (t === 'multiple_failed_logins') {
     return 'множественные неуспешные попытки входа';
   }
   if (t === 'repeated_network_errors') {
-    const count = incident.details && incident.details.events_count ? incident.details.events_count : null;
-    const windowMin = incident.details && incident.details.window_minutes ? incident.details.window_minutes : 60;
+    const count = details.events_count;
+    const windowMin = details.window_minutes || 60;
     if (count != null) {
       return `повторяющиеся сетевые ошибки: ${count} событий за последние ${windowMin} минут`;
     }
     return 'повторяющиеся сетевые ошибки';
   }
   if (t === 'service_crash_or_restart') {
-    const svc = incident.details && (incident.details.service || incident.details.process || incident.details.program);
+    const svc = details.service || details.process || details.program;
     if (svc) {
       return `сбой или перезапуск службы ${svc}`;
     }
     return 'сбой или перезапуск службы';
   }
-  return incident.description || 'инцидент безопасности';
+  if (incident.description) {
+    return incident.description;
+  }
+  if (t) {
+    return `инцидент безопасности: ${t}`;
+  }
+  return 'инцидент безопасности';
 }
 
 function renderDrilldownList(incidents) {
-  const listEl = document.getElementById('drilldownList');
-  if (!listEl) return;
-  listEl.innerHTML = '';
-  if (incidents.length === 0) {
-    listEl.innerHTML = '<p class="drilldown-empty">Нет инцидентов в этой категории.</p>';
-    return;
-  }
-  const header = document.createElement('div');
-  header.className = 'drilldown-row drilldown-row-header';
-  header.innerHTML = '<div class="drilldown-row-desc">Описание ошибки</div><div class="drilldown-row-program">Приложение/служба</div><div class="drilldown-row-time-h">Время обнаружения</div>';
-  listEl.appendChild(header);
+  const tbody = document.getElementById('drilldownList');
+  const emptyEl = document.getElementById('drilldownEmpty');
+  if (!tbody) return;
+
+  tbody.innerHTML = '';
+  if (emptyEl) emptyEl.classList.toggle('hidden', incidents.length !== 0);
+
   for (const inc of incidents) {
     const dt = inc.detected_at ? new Date(inc.detected_at) : null;
-    const timeStr = dt ? dt.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'medium' }) : '—';
+    const dateStr = dt ? dt.toLocaleDateString('ru-RU', { dateStyle: 'medium' }) : '—';
+    const timeStr = dt ? dt.toLocaleTimeString('ru-RU', { timeStyle: 'medium' }) : '—';
+
+    const details = inc.details || {};
     const program =
-      (inc.details && (inc.details.service || inc.details.process || inc.details.program)) ||
-      inc.incident_type ||
-      '—';
-    const description = toRussianDescription(inc);
-    const row = document.createElement('div');
-    row.className = 'drilldown-row';
-    row.innerHTML = `
-      <div class="drilldown-row-desc">${escapeHtml(description)}</div>
-      <div class="drilldown-row-program">${escapeHtml(program)}</div>
-      <div class="drilldown-row-time-h">${escapeHtml(timeStr)}</div>
+      details.service ||
+      details.process ||
+      details.program ||
+      details.application ||
+      'Не определено';
+
+    const type = toRussianDescription(inc);
+    const sev = (inc.severity || 'unknown').toLowerCase();
+
+    const sevLabel = SEVERITY_LABELS[sev] || sev;
+    const sevClass =
+      sev === 'critical' ? 'detail-sev-critical' :
+      sev === 'high' ? 'detail-sev-high' :
+      sev === 'medium' ? 'detail-sev-medium' :
+      sev === 'low' ? 'detail-sev-low' :
+      '';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(dateStr)}</td>
+      <td>${escapeHtml(timeStr)}</td>
+      <td>${escapeHtml(type)}</td>
+      <td><span class="detail-sev-badge ${sevClass}">${escapeHtml(sevLabel)}</span></td>
+      <td>${escapeHtml(program)}</td>
+      <td>${escapeHtml(inc.friendly_description || inc.description || '')}</td>
     `;
-    listEl.appendChild(row);
+    tbody.appendChild(tr);
   }
 }
 
@@ -399,11 +623,40 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+async function loadEventsChart() {
+  try {
+    const events = await apiCall(`${API_BASE}/api/events/?limit=500&offset=0`);
+    const data = buildEventsByHour(events || []);
+    renderEventsByHourChart(data);
+  } catch (_) {
+    const canvas = document.getElementById('eventsByHourChart');
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#7f8c8d';
+      ctx.font = '12px sans-serif';
+      ctx.fillText('Не удалось загрузить события', 20, canvas.height / 2);
+    }
+  }
+}
+
 async function loadIncidentsAndChart() {
   try {
     allIncidents = await fetchIncidents();
     const counts = buildSeverityCounts(allIncidents);
     renderSeverityChart(counts);
+    let eventsForStats = [];
+    try {
+      const events = await apiCall(`${API_BASE}/api/events/?limit=500&offset=0`);
+      eventsForStats = Array.isArray(events) ? events : [];
+    } catch (_) {
+      eventsForStats = [];
+    }
+
+    updateDashboardStats({ events: eventsForStats, incidents: allIncidents });
+
+    const eventsData = buildEventsByHour(eventsForStats || []);
+    renderEventsByHourChart(eventsData);
     await loadHistory();
   } catch (_) {
     const container = document.getElementById('chartContainer');
@@ -417,6 +670,26 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('runAnalysisBtn').addEventListener('click', runAnalysis);
   document.getElementById('generateMockBtn').addEventListener('click', collectFileEvents);
   document.getElementById('backToChartBtn').addEventListener('click', backToChart);
+
+  const detailView = document.getElementById('detailView');
+  if (detailView) detailView.setAttribute('aria-hidden', 'true');
+
+  const tabs = document.querySelectorAll('.detail-tab');
+  for (const t of tabs) {
+    t.addEventListener('click', () => {
+      const sev = (t.getAttribute('data-severity') || '').toLowerCase();
+      if (!sev) return;
+      openDrilldown(sev);
+    });
+  }
+
+  const searchEl = document.getElementById('detailSearchInput');
+  if (searchEl) {
+    searchEl.addEventListener('input', () => {
+      drilldownQuery = searchEl.value || '';
+      renderDrilldown();
+    });
+  }
 
   loadIncidentsAndChart();
   checkNewIncidents();

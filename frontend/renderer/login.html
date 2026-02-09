@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход — SIEM</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <h1 class="login-title">Система мониторинга SIEM</h1>
+            <form id="loginForm" class="login-form">
+                <div class="login-field">
+                    <label for="username">Имя пользователя</label>
+                    <input type="text" id="username" name="username" required autocomplete="username">
+                </div>
+                <div class="login-field">
+                    <label for="password">Пароль</label>
+                    <input type="password" id="password" name="password" required autocomplete="current-password">
+                </div>
+                <div id="loginError" class="login-error hidden"></div>
+                <button type="submit" class="login-button">Войти</button>
+            </form>
+        </div>
+    </div>
+    <script src="renderer.js"></script>
+</body>
+</html>

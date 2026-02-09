@@ -63,14 +63,40 @@ body {
 .topbar-user {
   margin-left: auto;
   display: flex;
-  gap: 0.4rem;
   align-items: center;
-  color: #2c3e50;
-  font-size: 0.95rem;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #7f8c8d;
 }
 
-.topbar-user-label {
-  color: #7f8c8d;
+.topbar-user-name {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.topbar-role {
+  background: #ecf0f1;
+  color: #34495e;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.topbar-logout {
+  background: #e74c3c;
+  color: #ffffff;
+  border: none;
+  padding: 0.35rem 0.65rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.topbar-logout:hover {
+  background: #c0392b;
 }
 
 .container {
@@ -629,4 +655,94 @@ header h1 {
   word-wrap: break-word;
   max-height: 360px;
   overflow-y: auto;
+}
+
+/* Login page styles */
+.login-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: #f5f6fa;
+  padding: 2rem;
+}
+
+.login-box {
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  padding: 3rem;
+  width: 100%;
+  max-width: 360px;
+}
+
+.login-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #2c3e50;
+  text-align: center;
+  margin: 0 0 2rem 0;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.login-field label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #34495e;
+}
+
+.login-field input {
+  padding: 0.75rem;
+  border: 1px solid #bdc3c7;
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.login-field input:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.login-error {
+  background: #fdf2f2;
+  border: 1px solid #f87171;
+  color: #b91c1c;
+  padding: 0.75rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.login-button {
+  background: #3498db;
+  color: #ffffff;
+  border: none;
+  padding: 0.875rem;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.login-button:hover {
+  background: #2980b9;
+}
+
+.login-button:disabled {
+  background: #95a5a6;
+  cursor: not-allowed;
 }

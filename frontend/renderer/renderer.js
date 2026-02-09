@@ -3,10 +3,63 @@ const API_BASE = 'http://127.0.0.1:8000';
 const SEEN_INCIDENTS_KEY = 'siem_seen_incident_ids';
 const POLL_INTERVAL_MS = 10000;
 
+const AUTH_CREDS_KEY = 'siem_auth_creds';
+
 let allIncidents = [];
 let seenIncidentIds = new Set();
 let drilldownSeverity = null;
 let drilldownQuery = '';
+
+let currentUser = null;
+
+function getAuthHeaders() {
+  const creds = localStorage.getItem(AUTH_CREDS_KEY);
+  if (!creds) return {};
+  const [username, password] = atob(creds).split(':');
+  return {
+    Authorization: 'Basic ' + btoa(username + ':' + password)
+  };
+}
+
+async function apiCall(url, options = {}) {
+  const fetchFn = window.electronAPI?.fetch || window.fetch;
+  const resp = await fetchFn(API_BASE + url, {
+    headers: { ...getAuthHeaders(), ...(options.headers || {}) },
+    ...options,
+  });
+  console.log('[DEBUG] fetch response:', resp);
+  // If electronAPI.fetch returns parsed JSON directly
+  if (resp && typeof resp === 'object' && !resp.status && !resp.statusCode) {
+    // Assume it's already parsed JSON and successful
+    return resp;
+  }
+  // Handle normal fetch Response object
+  const status = resp.status ?? resp.statusCode ?? resp.ok ? 200 : 500;
+  const statusText = resp.statusText ?? resp.statusMessage ?? '';
+  console.log('[DEBUG] status:', status, 'statusText:', statusText);
+  if (status !== 200) {
+    if (status === 401) {
+      logout();
+    }
+    throw new Error(`HTTP ${status}: ${statusText}`);
+  }
+  const text = await resp.text();
+  console.log('[DEBUG] response text:', text);
+  try {
+    return JSON.parse(text);
+  } catch (_) {
+    throw new Error('Invalid JSON response');
+  }
+}
+
+function logout() {
+  localStorage.removeItem(AUTH_CREDS_KEY);
+  currentUser = null;
+  if (window.location.pathname.endsWith('login.html')) {
+    return;
+  }
+  window.location.href = 'login.html';
+}
 
 function loadSeenIncidentIds() {
   try {
@@ -76,29 +129,10 @@ function updateDashboardStats({ events = [], incidents = [] } = {}) {
   }
 }
 
-async function apiCall(url, options = {}) {
-  const response = await window.electronAPI.fetch(url, options);
-  if (response && typeof response === 'object' && typeof response.ok === 'boolean') {
-    if (!response.ok) {
-      let text = '';
-      if (typeof response.text === 'function') {
-        try {
-          text = await response.text();
-        } catch (_) {}
-      }
-      throw new Error(text || `HTTP ${response.status}`);
-    }
-    if (typeof response.json === 'function') {
-      return response.json();
-    }
-  }
-  return response;
-}
-
 async function loadEvents() {
   showOutput('Загрузка событий...');
   try {
-    const data = await apiCall(`${API_BASE}/api/events/?limit=50&offset=0`);
+    const data = await apiCall('/api/events/?limit=50&offset=0');
     if (!Array.isArray(data) || data.length === 0) {
       showOutput('События загружены: данных нет.');
       return;
@@ -107,8 +141,8 @@ async function loadEvents() {
       `События загружены (${data.length} шт.):\n\n` +
       JSON.stringify(data, null, 2)
     );
-  } catch (error) {
-    showOutput(`Ошибка при загрузке событий:\n${error.message}`);
+  } catch (e) {
+    showOutput('Ошибка при загрузке событий: ' + e.message);
   }
 }
 
@@ -116,7 +150,7 @@ async function runAnalysis() {
   showOutput('Запуск анализа...');
   try {
     const data = await apiCall(
-      `${API_BASE}/api/analyze/run?since_minutes=60`,
+      '/api/analyze/run?since_minutes=60',
       { method: 'POST' }
     );
     const incidentsFound = data?.incidents_found ?? 0;
@@ -135,7 +169,7 @@ async function collectFileEvents() {
   showOutput('Сбор реальных логов из system.log...');
   try {
     const data = await apiCall(
-      `${API_BASE}/api/collect/file?file_path=./logs/system.log&max_lines=200`,
+      '/api/collect/file?file_path=./logs/system.log&max_lines=200',
       { method: 'POST' }
     );
     const collected = data?.collected_count ?? 0;
@@ -173,7 +207,7 @@ function showNewIncidentToast(incident) {
 }
 
 async function fetchIncidents() {
-  const data = await apiCall(`${API_BASE}/api/incidents/?limit=500&offset=0`);
+  const data = await apiCall('/api/incidents/?limit=500&offset=0');
   return Array.isArray(data) ? data : [];
 }
 
@@ -181,7 +215,7 @@ async function loadEventsHistory() {
   const listEl = document.getElementById('eventsHistory');
   if (!listEl) return;
   try {
-    const data = await apiCall(`${API_BASE}/api/events/?limit=20&offset=0`);
+    const data = await apiCall('/api/events/?limit=20&offset=0');
     listEl.innerHTML = '';
     if (!Array.isArray(data) || data.length === 0) {
       listEl.innerHTML = '<div class="history-empty">Событий нет</div>';
@@ -206,7 +240,7 @@ async function loadNotificationsHistory() {
   const listEl = document.getElementById('notificationsHistory');
   if (!listEl) return;
   try {
-    const data = await apiCall(`${API_BASE}/api/notifications/?limit=20&offset=0`);
+    const data = await apiCall('/api/notifications/?limit=20&offset=0');
     listEl.innerHTML = '';
     if (!Array.isArray(data) || data.length === 0) {
       listEl.innerHTML = '<div class="history-empty">Уведомлений нет</div>';
@@ -625,7 +659,7 @@ function escapeHtml(str) {
 
 async function loadEventsChart() {
   try {
-    const events = await apiCall(`${API_BASE}/api/events/?limit=500&offset=0`);
+    const events = await apiCall('/api/events/?limit=500&offset=0');
     const data = buildEventsByHour(events || []);
     renderEventsByHourChart(data);
   } catch (_) {
@@ -647,7 +681,7 @@ async function loadIncidentsAndChart() {
     renderSeverityChart(counts);
     let eventsForStats = [];
     try {
-      const events = await apiCall(`${API_BASE}/api/events/?limit=500&offset=0`);
+      const events = await apiCall('/api/events/?limit=500&offset=0');
       eventsForStats = Array.isArray(events) ? events : [];
     } catch (_) {
       eventsForStats = [];
@@ -696,9 +730,67 @@ document.addEventListener('DOMContentLoaded', () => {
 
   setInterval(async () => {
     try {
-      await apiCall(`${API_BASE}/api/analyze/run?since_minutes=60`, { method: 'POST' });
+      await apiCall('/api/analyze/run?since_minutes=60', { method: 'POST' });
     } catch (_) {}
     checkNewIncidents();
     loadIncidentsAndChart();
   }, POLL_INTERVAL_MS);
 });
+
+// Login page logic
+if (window.location.pathname.endsWith('login.html')) {
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const errorEl = document.getElementById('loginError');
+    const btn = e.target.querySelector('button[type="submit"]');
+
+    btn.disabled = true;
+    errorEl.classList.add('hidden');
+
+    try {
+      const creds = btoa(username + ':' + password);
+      localStorage.setItem(AUTH_CREDS_KEY, creds);
+      const user = await apiCall('/api/auth/me');
+      console.log('[DEBUG] Login success, user:', user);
+      currentUser = user;
+      console.log('[DEBUG] Redirecting to index.html');
+      window.location.href = 'index.html';
+    } catch (err) {
+      console.error('[DEBUG] Login error:', err);
+      errorEl.textContent = 'Неверное имя пользователя или пароль';
+      errorEl.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+} else {
+  // Main app: check auth and role
+  (async () => {
+    try {
+      const user = await apiCall('/api/auth/me');
+      currentUser = user;
+      // Update topbar
+      const usernameEl = document.getElementById('topbarUsername');
+      const roleEl = document.getElementById('topbarRole');
+      if (usernameEl) usernameEl.textContent = user.username || '—';
+      if (roleEl) roleEl.textContent = user.role === 'admin' ? 'Администратор' : 'Сотрудник';
+      if (user.role === 'admin') {
+        // Show all controls
+        document.querySelectorAll('[data-require-admin]').forEach(el => el.style.display = '');
+      } else {
+        // Hide admin-only controls
+        document.querySelectorAll('[data-require-admin]').forEach(el => el.style.display = 'none');
+      }
+    } catch (_) {
+      logout();
+    }
+  })();
+
+  // Logout handler
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', logout);
+  }
+}

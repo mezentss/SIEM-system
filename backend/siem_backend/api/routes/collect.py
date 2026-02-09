@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from siem_backend.api.auth import require_admin
 from siem_backend.services.collectors.file import FileLogCollector
 from siem_backend.services.collectors.macos import MacOSLogCollector, normalized_event_to_dict
 from siem_backend.services.collectors.mock import MockLogCollector
@@ -18,6 +19,7 @@ def collect_test(
     last: str = Query(default="2m"),
     max_entries: int = Query(default=50, ge=1, le=500),
     db: Session = Depends(get_db),
+    _ = Depends(require_admin),
 ) -> dict:
     collector = MacOSLogCollector(last=last, max_entries=max_entries)
     events = collector.collect()
@@ -34,6 +36,7 @@ def collect_file(
     file_path: str = Query(default="./logs/system.log"),
     max_lines: int = Query(default=100, ge=1, le=5000),
     db: Session = Depends(get_db),
+    _ = Depends(require_admin),
 ) -> dict:
     collector = FileLogCollector(file_path=file_path, max_lines=max_lines)
     events = collector.collect()
@@ -48,6 +51,7 @@ def collect_file(
 def collect_mock(
     event_count: int = Query(default=18, ge=10, le=20),
     db: Session = Depends(get_db),
+    _ = Depends(require_admin),
 ) -> dict:
     collector = MockLogCollector(event_count=event_count)
     events = collector.collect()
@@ -64,6 +68,7 @@ def collect_system(
     last_minutes: int = Query(default=5, ge=1, le=60),
     max_lines: int = Query(default=200, ge=1, le=5000),
     db: Session = Depends(get_db),
+    _ = Depends(require_admin),
 ) -> dict:
     """
     Собирает реальные логи macOS и сохраняет события в БД.

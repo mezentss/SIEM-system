@@ -17,7 +17,9 @@
       </nav>
       <div class="topbar-user">
         <span class="topbar-user-label">Пользователь:</span>
-        <span class="topbar-user-name">Администратор</span>
+        <span id="topbarUsername" class="topbar-user-name">—</span>
+        <span id="topbarRole" class="topbar-role">—</span>
+        <button id="logoutBtn" class="topbar-logout">Выход</button>
       </div>
     </div>
   </div>
@@ -27,9 +29,9 @@
     <div id="mainView" class="view">
       <main>
         <div class="controls">
-          <button id="loadEventsBtn">Загрузить события</button>
-          <button id="runAnalysisBtn">Запустить анализ</button>
-          <button id="generateMockBtn">Собрать события из файла</button>
+          <button id="loadEventsBtn" data-require-admin>Загрузить события</button>
+          <button id="runAnalysisBtn" data-require-admin>Запустить анализ</button>
+          <button id="generateMockBtn" data-require-admin>Собрать события из файла</button>
         </div>
 
         <section class="stats-grid" aria-label="Ключевые показатели">
@@ -74,7 +76,7 @@
           </section>
         </section>
 
-        <section class="panel-grid panel-grid-bottom" aria-label="История и журнал">
+        <section class="panel-grid panel-grid-bottom" aria-label="История и журнал" data-require-admin>
           <section class="panel">
             <div class="panel-header">
               <h2>Последние события</h2>
@@ -90,7 +92,7 @@
           </section>
         </section>
 
-        <section class="panel">
+        <section class="panel" data-require-admin>
           <div class="panel-header">
             <h2>Журнал операций</h2>
           </div>

@@ -29,6 +29,7 @@ def _check_table_schema(table_name: str, required_columns: List[str]) -> bool:
 
 def init_db() -> None:
     from siem_backend.data import models  # noqa: F401
+    from siem_backend.data import models_user  # noqa: F401
     from siem_backend.data.initial_data import init_reference_data
 
     # Требуемые колонки для каждой таблицы
@@ -39,6 +40,7 @@ def init_db() -> None:
             "id", "created_at", "notification_type", "severity", "title", "message",
             "incident_id", "event_id", "channel", "status", "details"
         ],
+        "users": ["id", "username", "hashed_password", "role"],
     }
 
     # Проверяем схему всех таблиц

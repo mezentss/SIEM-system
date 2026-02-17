@@ -14,8 +14,10 @@ let currentUser = null;
 
 function getAuthHeaders() {
   const creds = localStorage.getItem(AUTH_CREDS_KEY);
+  console.log('[DEBUG] Retrieved creds from localStorage:', creds ? 'found' : 'not found');
   if (!creds) return {};
   const [username, password] = atob(creds).split(':');
+  console.log('[DEBUG] Parsed username:', username, 'password length:', password ? password.length : 0);
   return {
     Authorization: 'Basic ' + btoa(username + ':' + password)
   };
@@ -700,10 +702,18 @@ async function loadIncidentsAndChart() {
 
 document.addEventListener('DOMContentLoaded', () => {
   loadSeenIncidentIds();
-  document.getElementById('loadEventsBtn').addEventListener('click', loadEvents);
-  document.getElementById('runAnalysisBtn').addEventListener('click', runAnalysis);
-  document.getElementById('generateMockBtn').addEventListener('click', collectFileEvents);
-  document.getElementById('backToChartBtn').addEventListener('click', backToChart);
+  
+  const loadEventsBtn = document.getElementById('loadEventsBtn');
+  if (loadEventsBtn) loadEventsBtn.addEventListener('click', loadEvents);
+  
+  const runAnalysisBtn = document.getElementById('runAnalysisBtn');
+  if (runAnalysisBtn) runAnalysisBtn.addEventListener('click', runAnalysis);
+  
+  const generateMockBtn = document.getElementById('generateMockBtn');
+  if (generateMockBtn) generateMockBtn.addEventListener('click', collectFileEvents);
+  
+  const backToChartBtn = document.getElementById('backToChartBtn');
+  if (backToChartBtn) backToChartBtn.addEventListener('click', backToChart);
 
   const detailView = document.getElementById('detailView');
   if (detailView) detailView.setAttribute('aria-hidden', 'true');
@@ -725,10 +735,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  loadIncidentsAndChart();
-  checkNewIncidents();
-
   setInterval(async () => {
+    // Only run if user is authenticated
+    if (!currentUser) return;
+    
     try {
       await apiCall('/api/analyze/run?since_minutes=60', { method: 'POST' });
     } catch (_) {}
@@ -751,7 +761,17 @@ if (window.location.pathname.endsWith('login.html')) {
 
     try {
       const creds = btoa(username + ':' + password);
+      console.log('[DEBUG] Saving credentials:', username, 'password length:', password.length);
       localStorage.setItem(AUTH_CREDS_KEY, creds);
+      console.log('[DEBUG] Credentials saved to localStorage');
+      
+      // Verify credentials were saved
+      const savedCreds = localStorage.getItem(AUTH_CREDS_KEY);
+      console.log('[DEBUG] Verification - saved creds:', savedCreds ? 'match' : 'failed');
+      
+      // Small delay to ensure localStorage is updated
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       const user = await apiCall('/api/auth/me');
       console.log('[DEBUG] Login success, user:', user);
       currentUser = user;
@@ -783,6 +803,10 @@ if (window.location.pathname.endsWith('login.html')) {
         // Hide admin-only controls
         document.querySelectorAll('[data-require-admin]').forEach(el => el.style.display = 'none');
       }
+      
+      // Load data after successful auth
+      loadIncidentsAndChart();
+      checkNewIncidents();
     } catch (_) {
       logout();
     }

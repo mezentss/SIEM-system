@@ -41,6 +41,7 @@ def init_db() -> None:
             "incident_id", "event_id", "channel", "status", "details"
         ],
         "users": ["id", "username", "hashed_password", "role"],
+        "analysis_rules": ["id", "name", "description", "enabled", "threshold", "window_minutes", "created_at", "updated_at"],
     }
 
     # Проверяем схему всех таблиц

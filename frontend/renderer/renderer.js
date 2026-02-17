@@ -304,21 +304,21 @@ function buildSeverityCounts(incidents) {
 }
 
 const SEVERITY_COLORS = {
-  critical: '#b63c3b',   // красный
-  high: '#f9c414',       // жёлтый
-  medium: '#26567a',     // синий
-  low: '#f7ead7',        // светлый
-  warning: '#505050',    // тёмно‑серый
-  unknown: '#4D4D4D'
+  critical: '#ed4246',
+  high: '#fa7415', 
+  medium: '#ecb30c',
+  low: '#3c83f7',
+  warning: '#6c757d',
+  unknown: '#495057',
 };
 
 const SEVERITY_LABELS = {
-  critical: 'Критическая',
-  high: 'Высокая',
-  medium: 'Средняя',
-  low: 'Низкая',
+  critical: 'Критический',
+  high: 'Высокий',
+  medium: 'Средний',
+  low: 'Низкий',
   warning: 'Предупреждение',
-  unknown: 'Неизвестно'
+  unknown: 'Неизвестно',
 };
 
 function buildEventsByHour(events) {
@@ -659,6 +659,96 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// Event type statistics
+function renderEventTypesStats(events) {
+  const container = document.getElementById('eventTypesContainer');
+  if (!container) return;
+  
+  const typeCounts = {};
+  events.forEach(ev => {
+    const type = ev.event_type || 'unknown';
+    typeCounts[type] = (typeCounts[type] || 0) + 1;
+  });
+  
+  container.innerHTML = '';
+  Object.entries(typeCounts).forEach(([type, count]) => {
+    const item = document.createElement('div');
+    item.className = 'event-type-item';
+    
+    // Translate event types to Russian
+    const translatedType = {
+      'auth_failed': 'Аутентификация',
+      'auth_success': 'Аутентификация', 
+      'network_error': 'Сеть',
+      'service_crash': 'Процесс',
+      'unknown': 'Неизвестно'
+    }[type] || type;
+    
+    item.innerHTML = `
+      <div class="event-type-count">${count}</div>
+      <div class="event-type-label">${translatedType}</div>
+    `;
+    container.appendChild(item);
+  });
+}
+
+// Recent events table
+function renderRecentEvents(events) {
+  const tbody = document.getElementById('recentEventsList');
+  if (!tbody) return;
+  
+  tbody.innerHTML = '';
+  events.slice(0, 20).forEach(ev => {
+    const dt = ev.ts ? new Date(ev.ts) : null;
+    const timeStr = dt ? dt.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'medium' }) : '—';
+    const type = ev.event_type || '—';
+    const severity = ev.severity || 'unknown';
+    const source = ev.source_category || '—';
+    const status = ev.status === 'resolved' ? 'resolved' : 'active';
+    
+    // Translate event types to Russian
+    const translatedType = {
+      'auth_failed': 'Аутентификация',
+      'auth_success': 'Аутентификация', 
+      'network_error': 'Сеть',
+      'service_crash': 'Процесс',
+      'unknown': 'Неизвестно'
+    }[type] || type;
+    
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(timeStr)}</td>
+      <td>${escapeHtml(translatedType)}</td>
+      <td><span class="detail-sev-badge detail-sev-${severity}">${escapeHtml(SEVERITY_LABELS[severity] || severity)}</span></td>
+      <td>${escapeHtml(source)}</td>
+      <td><span class="event-status ${status}">${status === 'resolved' ? 'Решено' : 'Активно'}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// View switching
+function switchView(viewName) {
+  const views = ['dashboard', 'reports', 'settings', 'employee'];
+  const navItems = document.querySelectorAll('.topbar-nav-item');
+  
+  views.forEach(v => {
+    const viewEl = document.getElementById(v + 'View');
+    if (viewEl) {
+      viewEl.classList.toggle('hidden', v !== viewName);
+    }
+  });
+  
+  navItems.forEach(item => {
+    const itemView = item.getAttribute('data-view');
+    if (itemView === viewName) {
+      item.classList.add('topbar-nav-item-active');
+    } else {
+      item.classList.remove('topbar-nav-item-active');
+    }
+  });
+}
+
 async function loadEventsChart() {
   try {
     const events = await apiCall('/api/events/?limit=500&offset=0');
@@ -688,7 +778,9 @@ async function loadIncidentsAndChart() {
     } catch (_) {
       eventsForStats = [];
     }
-
+    
+    renderEventTypesStats(eventsForStats);
+    renderRecentEvents(eventsForStats);
     updateDashboardStats({ events: eventsForStats, incidents: allIncidents });
 
     const eventsData = buildEventsByHour(eventsForStats || []);
@@ -702,6 +794,14 @@ async function loadIncidentsAndChart() {
 
 document.addEventListener('DOMContentLoaded', () => {
   loadSeenIncidentIds();
+  
+  // Navigation handlers
+  document.querySelectorAll('.topbar-nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const view = item.getAttribute('data-view');
+      if (view) switchView(view);
+    });
+  });
   
   const loadEventsBtn = document.getElementById('loadEventsBtn');
   if (loadEventsBtn) loadEventsBtn.addEventListener('click', loadEvents);

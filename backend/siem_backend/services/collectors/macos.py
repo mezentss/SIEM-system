@@ -77,13 +77,25 @@ class MacOSLogCollector(LogCollector):
 
         ts_iso = self._to_iso(ts)
 
+        # Extract process/application name from macOS unified log record
+        raw_data: dict[str, Any] = record
+        process = record.get("processName") or record.get("process") or record.get("senderImageName") or ""
+        subsystem = record.get("subsystem") or ""
+        
+        if process:
+            raw_data["process"] = process
+            raw_data["service"] = process
+            raw_data["application"] = process
+        if subsystem:
+            raw_data["subsystem"] = subsystem
+
         return NormalizedEvent(
             ts=ts_iso,
             source_os="macos",
             event_type="macos_unified_log",
             severity=severity,
             message=msg,
-            raw_data=record,
+            raw_data=raw_data,
         )
 
     def _to_iso(self, ts: Any) -> str:

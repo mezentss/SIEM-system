@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -72,6 +74,15 @@ class EventClassifier:
     @classmethod
     def classify_source_category(cls, message: str, raw_data: dict[str, Any], source_os: str) -> str:
         """Определяет категорию источника события."""
+        # First check explicit fields from raw_data
+        process = raw_data.get("process") or raw_data.get("service") or raw_data.get("application") or ""
+        process_lower = str(process).lower()
+
+        # Known system services
+        system_services = ["systemd", "launchd", "kernel", "init", "sshd", "cron", "rsyslog", "journald", "networkd", "udev", "dbus", "polkit", "network"]
+        if process_lower in system_services or process_lower.startswith("system"):
+            return "service"
+
         subsystem = raw_data.get("subsystem") or raw_data.get("category") or ""
         subsystem_lower = str(subsystem).lower()
 
@@ -82,6 +93,11 @@ class EventClassifier:
             return "user_process"
 
         msg_lower = (message or "").lower()
+        
+        # Check for .service pattern (systemd services like nginx.service)
+        if re.search(r"\b[a-zA-Z0-9_-]+\.service", msg_lower):
+            return "user_process"
+        
         if any(kw in msg_lower for kw in ["launchd", "systemd", "daemon", "service"]):
             return "service"
         if any(kw in msg_lower for kw in ["app", "application", "user process"]):

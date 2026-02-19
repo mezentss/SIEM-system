@@ -11,7 +11,7 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile('renderer/index.html');
+  mainWindow.loadFile('renderer/login.html');
 }
 
 app.whenReady().then(createWindow);

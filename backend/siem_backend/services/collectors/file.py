@@ -70,6 +70,13 @@ class FileLogCollector(LogCollector):
 
         text = raw_line or msg or ""
 
+        # Check for service name in message (e.g., "nginx.service:" in systemd logs)
+        service_in_msg_match = re.search(r"\b([a-zA-Z0-9_-]+)\.service:", msg or "")
+        if service_in_msg_match:
+            service_name = service_in_msg_match.group(1)
+            if is_meaningful(service_name):
+                return service_name
+
         # Full syslog line: "Jan 16 12:34:56 host process[pid]: message"
         m_full = re.match(
             r"^(?:[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+)?(?P<host>\S+)\s+(?P<proc>[^\s\[]+)(?:\[(?P<pid>\d+)\])?:\s+.*$",

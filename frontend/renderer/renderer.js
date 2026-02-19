@@ -227,7 +227,15 @@ async function loadEventsHistory() {
       const dt = ev.ts ? new Date(ev.ts) : null;
       const timeStr = dt ? dt.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'medium' }) : '—';
       const title = `${ev.event_type || ''} [${ev.severity || ''}]`.trim();
-      const meta = `${timeStr} · ${ev.source_category || ''} · ${ev.source_os || ''}`;
+      
+      // Translate source category
+      const sourceCat = {
+        'service': 'Сервис',
+        'user_process': 'Приложение',
+        'os': 'ОС'
+      }[ev.source_category] || ev.source_category;
+      
+      const meta = `${timeStr} · ${sourceCat} · ${ev.source_os || ''}`;
       const item = document.createElement('div');
       item.className = 'history-item';
       item.innerHTML = `<div class="history-item-title">${escapeHtml(title || 'Событие')}</div><div class="history-item-meta">${escapeHtml(meta)}</div>`;
@@ -293,14 +301,19 @@ function severityOrder(s) {
 }
 
 function buildSeverityCounts(incidents) {
-  const counts = {};
+  // Инициализируем все категории с нулём
+  const counts = { critical: 0, high: 0, medium: 0, low: 0 };
   for (const inc of incidents) {
-    const s = inc.severity || 'unknown';
-    counts[s] = (counts[s] || 0) + 1;
+    const s = (inc.severity || 'unknown').toLowerCase();
+    if (s in counts) {
+      counts[s] = (counts[s] || 0) + 1;
+    } else {
+      counts.unknown = (counts.unknown || 0) + 1;
+    }
   }
-  const entries = Object.entries(counts);
-  entries.sort((a, b) => severityOrder(a[0]) - severityOrder(b[0]));
-  return entries;
+  // Возвращаем в порядке важности
+  const order = ['critical', 'high', 'medium', 'low'];
+  return order.map(s => [s, counts[s] || 0]);
 }
 
 const SEVERITY_COLORS = {
@@ -322,14 +335,18 @@ const SEVERITY_LABELS = {
 };
 
 function buildEventsByHour(events) {
+  // Показываем события за последние 24 часа с группировкой по часам
   const now = new Date();
-  const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 часа назад
   const buckets = {};
   for (const ev of events) {
     if (!ev.ts) continue;
     const ts = new Date(ev.ts);
     if (ts < cutoff) continue;
-    const moscowMs = ts.getTime() + 3 * 60 * 60 * 1000;
+    // Округляем до часа для группировки
+    const hour = new Date(ts);
+    hour.setMinutes(0, 0, 0);
+    const moscowMs = hour.getTime() + 3 * 60 * 60 * 1000;
     const moscow = new Date(moscowMs);
     const label = moscow.toLocaleString('ru-RU', {
       day: '2-digit',
@@ -345,10 +362,11 @@ function buildEventsByHour(events) {
       buckets[label][s] += 1;
     }
   }
+  // Сортируем метки по убыванию (новые слева)
   const labels = Object.keys(buckets).sort((a, b) => {
     const da = new Date(a);
     const db = new Date(b);
-    return da - db;
+    return db - da; // Обратный порядок - новые слева
   });
   return { labels, buckets };
 }
@@ -394,7 +412,8 @@ function renderEventsByHourChart(data) {
   const step = Math.max(1, Math.floor(labels.length / 6));
   labels.forEach((label, i) => {
     if (i % step !== 0 && i !== labels.length - 1) return;
-    const x = paddingLeft + i * (barWidth + gap) + barWidth / 2;
+    // Позиция метки соответствует столбцу (справа налево)
+    const x = paddingLeft + plotWidth - (i + 1) * (barWidth + gap) + gap + barWidth / 2;
     const text = label;
     ctx.save();
     ctx.translate(x, paddingTop + plotHeight + 12);
@@ -404,7 +423,8 @@ function renderEventsByHourChart(data) {
   });
   labels.forEach((label, i) => {
     const b = data.buckets[label];
-    const x = paddingLeft + i * (barWidth + gap);
+    // Рисуем столбцы справа налево (новые слева)
+    const x = paddingLeft + plotWidth - (i + 1) * (barWidth + gap) + gap;
     let y = paddingTop + plotHeight;
     function drawStack(count, color) {
       if (!count) return;
@@ -428,7 +448,16 @@ function renderSeverityChart(counts) {
     container.innerHTML = '<p class="chart-empty">Нет инцидентов для отображения.</p>';
     return;
   }
-  const total = counts.reduce((s, [, n]) => s + n, 0);
+  
+  // Фильтруем только ненулевые значения для диаграммы
+  const nonZeroCounts = counts.filter(([, n]) => n > 0);
+  
+  if (nonZeroCounts.length === 0) {
+    container.innerHTML = '<p class="chart-empty">Нет инцидентов для отображения.</p>';
+    return;
+  }
+  
+  const total = nonZeroCounts.reduce((s, [, n]) => s + n, 0);
   const size = 280;
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -442,7 +471,7 @@ function renderSeverityChart(counts) {
   const r = Math.min(cx, cy) - 8;
   let startAngle = -Math.PI / 2;
   const segments = [];
-  for (const [severity, count] of counts) {
+  for (const [severity, count] of nonZeroCounts) {
     const ratio = count / total;
     const sweep = ratio * 2 * Math.PI;
     const endAngle = startAngle + sweep;
@@ -483,6 +512,7 @@ function renderSeverityChart(counts) {
   container.appendChild(canvas);
   const legend = document.createElement('div');
   legend.className = 'pie-legend';
+  // Показываем все категории в легенде (включая нулевые)
   for (const [severity, count] of counts) {
     const item = document.createElement('button');
     item.type = 'button';
@@ -674,16 +704,20 @@ function renderEventTypesStats(events) {
   Object.entries(typeCounts).forEach(([type, count]) => {
     const item = document.createElement('div');
     item.className = 'event-type-item';
-    
+
     // Translate event types to Russian
     const translatedType = {
       'auth_failed': 'Аутентификация',
-      'auth_success': 'Аутентификация', 
+      'auth_success': 'Аутентификация',
+      'authentication': 'Аутентификация',
       'network_error': 'Сеть',
-      'service_crash': 'Процесс',
+      'network': 'Сеть',
+      'service_crash': 'Сервис',
+      'service': 'Сервис',
+      'process': 'Процесс',
       'unknown': 'Неизвестно'
     }[type] || type;
-    
+
     item.innerHTML = `
       <div class="event-type-count">${count}</div>
       <div class="event-type-label">${translatedType}</div>
@@ -696,7 +730,7 @@ function renderEventTypesStats(events) {
 function renderRecentEvents(events) {
   const tbody = document.getElementById('recentEventsList');
   if (!tbody) return;
-  
+
   tbody.innerHTML = '';
   events.slice(0, 20).forEach(ev => {
     const dt = ev.ts ? new Date(ev.ts) : null;
@@ -705,22 +739,33 @@ function renderRecentEvents(events) {
     const severity = ev.severity || 'unknown';
     const source = ev.source_category || '—';
     const status = ev.status === 'resolved' ? 'resolved' : 'active';
-    
+
     // Translate event types to Russian
     const translatedType = {
       'auth_failed': 'Аутентификация',
-      'auth_success': 'Аутентификация', 
+      'auth_success': 'Аутентификация',
+      'authentication': 'Аутентификация',
       'network_error': 'Сеть',
-      'service_crash': 'Процесс',
+      'network': 'Сеть',
+      'service_crash': 'Сервис',
+      'service': 'Сервис',
+      'process': 'Процесс',
       'unknown': 'Неизвестно'
     }[type] || type;
-    
+
+    // Translate source categories to Russian
+    const translatedSource = {
+      'service': 'Сервис',
+      'user_process': 'Приложение',
+      'os': 'ОС'
+    }[source] || source;
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${escapeHtml(timeStr)}</td>
       <td>${escapeHtml(translatedType)}</td>
       <td><span class="detail-sev-badge detail-sev-${severity}">${escapeHtml(SEVERITY_LABELS[severity] || severity)}</span></td>
-      <td>${escapeHtml(source)}</td>
+      <td>${escapeHtml(translatedSource)}</td>
       <td><span class="event-status ${status}">${status === 'resolved' ? 'Решено' : 'Активно'}</span></td>
     `;
     tbody.appendChild(tr);
@@ -835,16 +880,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  setInterval(async () => {
-    // Only run if user is authenticated
-    if (!currentUser) return;
-    
-    try {
-      await apiCall('/api/analyze/run?since_minutes=60', { method: 'POST' });
-    } catch (_) {}
-    checkNewIncidents();
-    loadIncidentsAndChart();
-  }, POLL_INTERVAL_MS);
+  // Start polling after authentication
+  startPolling();
 });
 
 // Login page logic
@@ -888,6 +925,14 @@ if (window.location.pathname.endsWith('login.html')) {
 } else {
   // Main app: check auth and role
   (async () => {
+    // Check if we have stored credentials
+    const storedCreds = localStorage.getItem(AUTH_CREDS_KEY);
+    if (!storedCreds) {
+      console.log('[DEBUG] No stored credentials, redirecting to login');
+      logout();
+      return;
+    }
+    
     try {
       const user = await apiCall('/api/auth/me');
       currentUser = user;
@@ -903,12 +948,17 @@ if (window.location.pathname.endsWith('login.html')) {
         // Hide admin-only controls
         document.querySelectorAll('[data-require-admin]').forEach(el => el.style.display = 'none');
       }
-      
+
       // Load data after successful auth
       loadIncidentsAndChart();
       checkNewIncidents();
-    } catch (_) {
-      logout();
+
+      // Start polling for all users
+      startPolling();
+    } catch (err) {
+      console.error('[DEBUG] Auth check failed:', err);
+      // Only logout on 401 (unauthorized), not on network errors
+      // User stays logged in if backend is temporarily unavailable
     }
   })();
 
@@ -917,4 +967,40 @@ if (window.location.pathname.endsWith('login.html')) {
   if (logoutBtn) {
     logoutBtn.addEventListener('click', logout);
   }
+}
+
+// Start polling for all authenticated users
+function startPolling() {
+  // Polling every 10 seconds for incidents and chart updates
+  setInterval(async () => {
+    // Only run if user is authenticated
+    if (!currentUser) return;
+
+    try {
+      await apiCall('/api/analyze/run?since_minutes=60', { method: 'POST' });
+    } catch (_) {}
+    checkNewIncidents();
+    loadIncidentsAndChart();
+  }, POLL_INTERVAL_MS);
+
+  // Schedule chart refresh at midnight (00:00)
+  scheduleMidnightRefresh();
+}
+
+// Schedule a refresh of the chart at midnight to start a new day
+function scheduleMidnightRefresh() {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  
+  const msUntilMidnight = tomorrow.getTime() - now.getTime();
+  
+  console.log('[DEBUG] Next chart refresh at midnight in', Math.round(msUntilMidnight / 1000), 'seconds');
+  
+  setTimeout(() => {
+    loadIncidentsAndChart();
+    // Schedule next midnight refresh
+    scheduleMidnightRefresh();
+  }, msUntilMidnight);
 }

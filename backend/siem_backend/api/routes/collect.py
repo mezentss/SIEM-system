@@ -33,17 +33,25 @@ def collect_test(
 
 @router.post("/file")
 def collect_file(
-    file_path: str = Query(default="./logs/system.log"),
+    file_path: str = Query(default=None),
     max_lines: int = Query(default=100, ge=1, le=5000),
     db: Session = Depends(get_db),
     _ = Depends(require_admin),
 ) -> dict:
+    import os
+    # Если путь не указан, используем путь относительно backend директории
+    if not file_path:
+        # backend/siem_backend/api/routes/ -> backend/
+        backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        file_path = os.path.join(backend_dir, "logs", "system.log")
+    
     collector = FileLogCollector(file_path=file_path, max_lines=max_lines)
     events = collector.collect()
     saved_count = EventService().save_normalized_events(db, events)
     return {
         "collected_count": len(events),
         "saved_count": saved_count,
+        "file_path": file_path,
     }
 
 

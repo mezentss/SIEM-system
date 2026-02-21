@@ -48,3 +48,112 @@
 2026-01-16 15:48:00.953383+0300  localhost fseventsd[94]: (libsystem_info.dylib) Created Activity ID: 0xbc2b4, Description: Resolve user group list
 2026-01-16 15:48:00.953386+0300  localhost fseventsd[94]: (libsystem_info.dylib) Created Activity ID: 0xbc2b5, Description: Resolve user group list
 2026-01-16 15:48:00.954464+0300  localhost fseventsd[94]: (libsystem_info.dylib) Created Activity ID: 0xbc2b6, Description: Resolve user group list
+2025-08-17 10:00:01,000 INFO sshd[1234]: Failed login attempt for user admin from 192.168.1.100
+2025-08-17 10:00:05,000 INFO sshd[1235]: Login failed for user admin from 192.168.1.100
+2025-08-17 10:00:09,000 INFO sshd[1236]: Authentication failure for user admin from 192.168.1.100
+2025-08-17 10:00:13,000 INFO sshd[1237]: Failed login attempt for user admin from 192.168.1.100
+2025-08-17 10:00:17,000 INFO sshd[1238]: Login failed for user admin from 192.168.1.100
+2025-08-17 10:00:21,000 INFO sshd[1239]: Failed login attempt for user admin from 192.168.1.100
+2025-08-17 10:01:00,000 ERROR network[4567]: Connection timeout to 10.0.0.5:80
+2025-08-17 10:01:05,000 ERROR network[4568]: Connection timeout to 10.0.0.5:80
+2025-08-17 10:01:10,000 ERROR network[4569]: Connection timeout to 10.0.0.5:80
+2025-08-17 10:01:15,000 ERROR network[4570]: Connection timeout to 10.0.0.5:80
+2025-08-17 10:01:20,000 ERROR network[4571]: Connection timeout to 10.0.0.5:80
+2025-08-17 10:02:00,000 INFO systemd[1]: nginx.service: Main process exited, status=1/FAILURE
+2025-08-17 10:02:05,000 INFO systemd[1]: nginx.service: Failed with result 'exit-code'
+2025-08-17 10:02:10,000 INFO systemd[1]: nginx.service: Service hold-off time over, scheduling restart
+2025-08-17 10:02:15,000 INFO systemd[1]: nginx.service: Restarting...
+2025-08-17 10:02:20,000 INFO systemd[1]: nginx.service: Started successfully
+2026-02-21 09:37:51,436 INFO docker[5261]: Database connection lost
+2026-02-21 09:40:51,000 INFO systemd[1]: Slack.service: Main process exited, status=1/FAILURE
+2026-02-21 09:44:51,082 ERROR Photoshop[6271]: Failed to initialize component
+2026-02-21 09:45:51,946 ERROR Calendar[3880]: File not found: config.json
+2026-02-21 09:46:51,750 CRITICAL Mail[9322]: Application crashed: out of memory
+2026-02-21 09:52:51,152 ERROR mysql[6205]: Application exited unexpectedly with code 1
+2026-02-21 09:52:51,000 INFO systemd[1]: Photoshop.service: Restarting...
+2026-02-21 09:53:51,158 CRITICAL zoom[5175]: Application exited unexpectedly with code 1
+2026-02-21 09:56:51,281 CRITICAL docker[6470]: Permission denied: /var/log/app.log
+2026-02-21 09:57:51,371 CRITICAL Photoshop[9837]: SSL handshake failed
+2026-02-21 09:57:51,000 INFO systemd[1]: Word.service: Main process exited, status=1/FAILURE
+2026-02-21 09:58:51,329 CRITICAL Excel[1513]: Application terminated unexpectedly
+2026-02-21 10:03:51,560 ERROR Chrome[7578]: Fatal error: unable to allocate memory
+2026-02-21 10:04:51,000 INFO systemd[1]: Safari.service: Restarting...
+2026-02-21 10:09:51,402 WARNING Photoshop[1265]: SSL handshake failed
+2026-02-21 10:09:51,660 ERROR Word[6851]: SSL handshake failed
+2026-02-21 10:12:51,836 INFO Teams[7516]: Application exited unexpectedly with code 1
+2026-02-21 10:12:51,206 ERROR Chrome[3569]: Connection failed: timeout
+2026-02-21 10:15:51,004 ERROR Calendar[3139]: Segmentation fault (core dumped)
+2026-02-21 10:21:51,079 ERROR Slack[2904]: Application exited unexpectedly with code 1
+2026-02-21 10:23:51,207 ERROR Photoshop[7941]: Failed to initialize component
+2026-02-21 10:28:51,230 WARNING mysql[6022]: Connection failed: timeout
+2026-02-21 10:28:51,000 INFO systemd[1]: zoom.service: Service hold-off time over, scheduling restart
+2026-02-21 10:31:51,286 ERROR Mail[9667]: Permission denied: /var/log/app.log
+2026-02-21 10:35:51,567 CRITICAL Calendar[5853]: Document save failed: disk full
+2026-02-21 09:44:40,850 ERROR docker[1784]: Document save failed: disk full
+2026-02-21 09:44:40,134 ERROR docker[4219]: Application crashed: out of memory
+2026-02-21 09:47:40,432 CRITICAL Safari[5901]: Document save failed: disk full
+2026-02-21 09:51:40,000 INFO systemd[1]: docker.service: Restarting...
+2026-02-21 09:52:40,057 CRITICAL zoom[1527]: Permission denied: /var/log/app.log
+2026-02-21 09:59:40,083 ERROR mysql[4010]: Database connection lost
+2026-02-21 10:01:40,000 INFO systemd[1]: Safari.service: Failed with result 'exit-code'
+2026-02-21 10:04:40,765 WARNING redis[8551]: Connection failed: timeout
+2026-02-21 10:05:40,933 WARNING docker[7775]: Segmentation fault (core dumped)
+2026-02-21 10:06:40,470 ERROR Slack[2154]: Document save failed: disk full
+2026-02-21 10:09:40,146 CRITICAL nginx[6029]: SSL handshake failed
+2026-02-21 10:10:40,056 WARNING Chrome[2720]: Failed to connect to server: connection refused
+2026-02-21 10:11:40,761 ERROR redis[1364]: Database connection lost
+2026-02-21 10:14:40,380 ERROR mysql[1037]: Permission denied: /var/log/app.log
+2026-02-21 10:14:40,000 INFO systemd[1]: nginx.service: Restarting...
+2026-02-21 10:17:40,801 ERROR redis[7088]: Process killed due to high CPU usage
+2026-02-21 10:19:40,942 ERROR Finder[2211]: Application terminated unexpectedly
+2026-02-21 10:21:40,324 ERROR Safari[8369]: Application terminated unexpectedly
+2026-02-21 10:22:40,000 INFO systemd[1]: Word.service: Main process exited, status=1/FAILURE
+2026-02-21 10:26:40,414 ERROR nginx[4375]: SSL handshake failed
+2026-02-21 10:33:40,000 INFO systemd[1]: redis.service: Failed with result 'exit-code'
+2026-02-21 10:34:40,364 WARNING Photoshop[9705]: Document save failed: disk full
+2026-02-21 10:37:40,599 WARNING redis[9734]: Fatal error: unable to allocate memory
+2026-02-21 10:37:40,585 ERROR mysql[2966]: Application exited unexpectedly with code 1
+2026-02-21 10:40:40,712 INFO Excel[4102]: SSL handshake failed
+2026-02-21 09:45:00,972 CRITICAL Photoshop[5131]: Failed to connect to server: connection refused
+2026-02-21 09:51:00,869 ERROR Safari[1871]: Connection failed: timeout
+2026-02-21 09:51:00,256 WARNING Slack[1281]: Permission denied: /var/log/app.log
+2026-02-21 09:52:00,106 ERROR Chrome[7085]: Process killed due to high CPU usage
+2026-02-21 09:52:00,000 INFO systemd[1]: redis.service: Main process exited, status=1/FAILURE
+2026-02-21 09:59:00,680 ERROR mysql[4622]: Database connection lost
+2026-02-21 10:02:00,318 INFO Finder[2505]: Process killed due to high CPU usage
+2026-02-21 10:07:00,969 ERROR Photoshop[3711]: Application crashed: out of memory
+2026-02-21 10:09:00,528 ERROR Teams[2837]: Failed to connect to server: connection refused
+2026-02-21 10:09:00,639 ERROR Excel[8140]: Failed to connect to server: connection refused
+2026-02-21 10:12:00,221 WARNING Safari[5989]: Process killed due to high CPU usage
+2026-02-21 10:12:00,000 INFO systemd[1]: Slack.service: Restarting...
+2026-02-21 10:14:00,426 WARNING Calendar[8865]: Database connection lost
+2026-02-21 10:15:00,596 ERROR mysql[8129]: Application exited unexpectedly with code 1
+2026-02-21 10:15:00,000 INFO systemd[1]: mysql.service: Main process exited, status=1/FAILURE
+2026-02-21 10:18:00,467 WARNING Photoshop[7040]: Connection failed: timeout
+2026-02-21 10:18:00,000 INFO systemd[1]: nginx.service: Failed with result 'exit-code'
+2026-02-21 10:26:00,968 ERROR Slack[7253]: Fatal error: unable to allocate memory
+2026-02-21 10:28:00,000 INFO systemd[1]: Photoshop.service: Failed with result 'exit-code'
+2026-02-21 10:30:00,344 ERROR Safari[4210]: SSL handshake failed
+2026-02-21 10:35:00,031 INFO Photoshop[3784]: Connection failed: timeout
+2026-02-21 10:37:00,041 ERROR zoom[9059]: Connection failed: timeout
+2026-02-21 10:38:00,590 WARNING docker[4976]: Process killed due to high CPU usage
+2026-02-21 10:39:00,766 ERROR Word[7494]: File not found: config.json
+2026-02-21 10:40:00,961 ERROR Excel[8820]: Application exited unexpectedly with code 1
+2026-02-21 12:00:00,000 ERROR zoom[1234]: Application crashed
+2026-02-21 12:01:00,000 ERROR zoom[1234]: Application crashed
+2026-02-21 12:02:00,000 ERROR zoom[1234]: Application crashed
+2026-02-21 12:03:00,000 ERROR nginx[5678]: Connection timeout
+2026-02-21 12:04:00,000 ERROR nginx[5678]: Connection timeout
+2026-02-21 12:05:00,000 ERROR mysql[9012]: Connection refused
+2026-02-21 12:10:00,000 ERROR app1[1111]: Application crashed
+2026-02-21 12:11:00,000 ERROR app1[1111]: Application crashed
+2026-02-21 12:12:00,000 ERROR app1[1111]: Application crashed
+2026-02-21 12:13:00,000 ERROR app1[1111]: Application crashed
+2026-02-21 12:14:00,000 ERROR app1[1111]: Application crashed
+2026-02-21 12:15:00,000 ERROR app1[1111]: Application crashed
+2026-02-21 12:16:00,000 ERROR app1[1111]: Application crashed
+2026-02-21 12:17:00,000 ERROR app1[1111]: Application crashed
+2026-02-21 12:18:00,000 ERROR app1[1111]: Application crashed
+2026-02-21 12:19:00,000 ERROR app1[1111]: Application crashed
+2026-02-21 12:20:00,000 ERROR app1[1111]: Application crashed
+2026-02-21 12:21:00,000 ERROR app1[1111]: Application crashed

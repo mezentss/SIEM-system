@@ -47,9 +47,16 @@ class RepeatedNetworkErrorsRule(BaseRule):
         if count < self._threshold:
             return []
 
-        severity = "warning"
-        if count >= max(self._threshold * 2, 20):
+        # Определяем серьёзность на основе количества событий
+        severity = "low"
+        if count >= 200:
             severity = "critical"
+        elif count >= 100:
+            severity = "high"
+        elif count >= 50:
+            severity = "medium"
+        elif count >= 10:
+            severity = "low"
 
         last_event_id = matched[-1].id if matched else None
 

@@ -29,3 +29,6 @@ build/
 
 siem.db
 logs
+
+# ===== Development notes =====
+DEV_NOTES.md

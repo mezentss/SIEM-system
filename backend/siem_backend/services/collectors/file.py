@@ -77,6 +77,16 @@ class FileLogCollector(LogCollector):
             if is_meaningful(service_name):
                 return service_name
 
+        # Format: "2026-02-21 12:00:00,000 ERROR zoom[1234]: message"
+        iso_format_match = re.match(
+            r"^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d+\s+\w+\s+(?P<proc>[^\s\[]+)(?:\[(?P<pid>\d+)\])?:\s+.*$",
+            text,
+        )
+        if iso_format_match:
+            proc = iso_format_match.group("proc")
+            if is_meaningful(proc):
+                return proc
+
         # Full syslog line: "Jan 16 12:34:56 host process[pid]: message"
         m_full = re.match(
             r"^(?:[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+)?(?P<host>\S+)\s+(?P<proc>[^\s\[]+)(?:\[(?P<pid>\d+)\])?:\s+.*$",

@@ -39,6 +39,9 @@ class IncidentService:
             if c.event_id is None or (c.event_id, c.incident_type) not in existing_pairs
         ]
 
+        # Проверяем, какие типы инцидентов уже были отправлены за последние 2 часа
+        recent_incident_types = self._repo.get_recent_incident_types(db, since_minutes=120)
+
         event_by_id: Dict[int, Event] = {}
         unique_event_ids = sorted({c.event_id for c in new_candidates if c.event_id is not None})
         if unique_event_ids:
@@ -52,6 +55,9 @@ class IncidentService:
         saved_count = self._repo.add_many(db, incidents)
 
         for incident in incidents:
+            # Не отправляем уведомление, если такой тип инцидента уже был за последние 2 часа
+            if incident.incident_type in recent_incident_types:
+                continue
             try:
                 self._notification_service.notify_incident(db, incident)
             except Exception:

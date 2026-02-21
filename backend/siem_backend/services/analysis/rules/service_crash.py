@@ -32,7 +32,6 @@ class ServiceCrashOrRestartRule(BaseRule):
             "panic",
             "exited",
             "restart",
-            "launchd",
         ]
 
         matched: List[Event] = []
@@ -45,13 +44,24 @@ class ServiceCrashOrRestartRule(BaseRule):
         if count < self._threshold:
             return []
 
+        # Определяем серьёзность на основе количества событий
+        severity = "low"
+        if count >= 100:
+            severity = "critical"
+        elif count >= 50:
+            severity = "high"
+        elif count >= 10:
+            severity = "medium"
+        elif count >= 3:
+            severity = "low"
+
         last_event_id = matched[-1].id if matched else None
         description = f"Service crash/restart indicators detected: {count} events."
 
         return [
             IncidentCandidate(
                 incident_type=self.name,
-                severity="critical",
+                severity=severity,
                 description=description,
                 detected_at=until,
                 event_id=last_event_id,

@@ -28,3 +28,14 @@ class IncidentRepository:
         db.add_all(list(incidents))
         db.commit()
         return len(incidents)
+
+    def get_recent_incident_types(self, db: Session, since_minutes: int = 120) -> Set[str]:
+        """Возвращает типы инцидентов, которые были созданы за последние N минут."""
+        import datetime as dt
+        cutoff = dt.datetime.utcnow() - dt.timedelta(minutes=since_minutes)
+        stmt = select(Incident.incident_type).where(
+            Incident.detected_at >= cutoff,
+            Incident.incident_type.isnot(None),
+        )
+        rows = db.execute(stmt).all()
+        return {row[0] for row in rows if row[0] is not None}

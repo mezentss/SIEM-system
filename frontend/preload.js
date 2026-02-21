@@ -12,4 +12,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     return response.json();
   },
+  
+  // Метод для сохранения данных перед закрытием
+  saveAppState: (key, value) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (e) {
+      console.error('Failed to save app state:', e);
+      return false;
+    }
+  },
+  
+  // Метод для загрузки сохранённых данных
+  loadAppState: (key) => {
+    try {
+      const value = localStorage.getItem(key);
+      return value ? JSON.parse(value) : null;
+    } catch (e) {
+      console.error('Failed to load app state:', e);
+      return null;
+    }
+  }
 });

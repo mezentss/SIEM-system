@@ -171,17 +171,18 @@ async function collectFileEvents() {
   showOutput('Сбор реальных логов из system.log...');
   try {
     const data = await apiCall(
-      '/api/collect/file?file_path=./logs/system.log&max_lines=200',
+      '/api/collect/file?max_lines=200',
       { method: 'POST' }
     );
     const collected = data?.collected_count ?? 0;
     const saved = data?.saved_count ?? 0;
+    const filePath = data?.file_path ?? 'unknown';
     if (collected === 0) {
-      showOutput('В файле логов нет новых событий.');
+      showOutput('В файле логов нет новых событий.\nПуть к файлу: ' + filePath);
       return;
     }
     showOutput(
-      `События собраны.\nСохранено: ${saved}\n\nЗагрузка событий...`
+      `События собраны.\nСохранено: ${saved}\nПуть: ${filePath}\n\nЗагрузка событий...`
     );
     await loadEvents();
     await checkNewIncidents();
@@ -774,16 +775,16 @@ function renderRecentEvents(events) {
 
 // View switching
 function switchView(viewName) {
-  const views = ['dashboard', 'reports', 'settings', 'employee'];
+  const views = ['dashboard', 'map', 'reports', 'settings', 'employee'];
   const navItems = document.querySelectorAll('.topbar-nav-item');
-  
+
   views.forEach(v => {
     const viewEl = document.getElementById(v + 'View');
     if (viewEl) {
       viewEl.classList.toggle('hidden', v !== viewName);
     }
   });
-  
+
   navItems.forEach(item => {
     const itemView = item.getAttribute('data-view');
     if (itemView === viewName) {
@@ -830,6 +831,11 @@ async function loadIncidentsAndChart() {
 
     const eventsData = buildEventsByHour(eventsForStats || []);
     renderEventsByHourChart(eventsData);
+    
+    // Render app map
+    renderAppMap(eventsForStats);
+    renderAppErrorsTable(eventsForStats);
+    
     await loadHistory();
   } catch (_) {
     const container = document.getElementById('chartContainer');
@@ -901,14 +907,14 @@ if (window.location.pathname.endsWith('login.html')) {
       console.log('[DEBUG] Saving credentials:', username, 'password length:', password.length);
       localStorage.setItem(AUTH_CREDS_KEY, creds);
       console.log('[DEBUG] Credentials saved to localStorage');
-      
+
       // Verify credentials were saved
       const savedCreds = localStorage.getItem(AUTH_CREDS_KEY);
       console.log('[DEBUG] Verification - saved creds:', savedCreds ? 'match' : 'failed');
-      
+
       // Small delay to ensure localStorage is updated
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       const user = await apiCall('/api/auth/me');
       console.log('[DEBUG] Login success, user:', user);
       currentUser = user;
@@ -922,6 +928,20 @@ if (window.location.pathname.endsWith('login.html')) {
       btn.disabled = false;
     }
   });
+  
+  // Check for stored credentials on login page (auto-login)
+  (async () => {
+    const storedCreds = localStorage.getItem(AUTH_CREDS_KEY);
+    if (storedCreds) {
+      try {
+        const user = await apiCall('/api/auth/me');
+        console.log('[DEBUG] Auto-login success:', user);
+        window.location.href = 'index.html';
+      } catch (_) {
+        console.log('[DEBUG] Auto-login failed, showing login form');
+      }
+    }
+  })();
 } else {
   // Main app: check auth and role
   (async () => {
@@ -971,20 +991,42 @@ if (window.location.pathname.endsWith('login.html')) {
 
 // Start polling for all authenticated users
 function startPolling() {
+  // Initial collection for admin users
+  if (currentUser && currentUser.role === 'admin') {
+    collectFileEventsSilent();
+  }
+
   // Polling every 10 seconds for incidents and chart updates
   setInterval(async () => {
     // Only run if user is authenticated
     if (!currentUser) return;
 
-    try {
-      await apiCall('/api/analyze/run?since_minutes=60', { method: 'POST' });
-    } catch (_) {}
+    // Run analysis only for admins (non-admins get 403)
+    if (currentUser.role === 'admin') {
+      try {
+        await apiCall('/api/analyze/run?since_minutes=60', { method: 'POST' });
+      } catch (_) {}
+
+      // Collect new events periodically (for admin only)
+      await collectFileEventsSilent();
+    }
+
+    // Load data for all users
     checkNewIncidents();
     loadIncidentsAndChart();
   }, POLL_INTERVAL_MS);
 
   // Schedule chart refresh at midnight (00:00)
   scheduleMidnightRefresh();
+}
+
+// Silent file collection (no UI output)
+async function collectFileEventsSilent() {
+  try {
+    await apiCall('/api/collect/file?max_lines=200', { method: 'POST' });
+  } catch (_) {
+    // Ignore errors in silent mode
+  }
 }
 
 // Schedule a refresh of the chart at midnight to start a new day
@@ -1004,3 +1046,192 @@ function scheduleMidnightRefresh() {
     scheduleMidnightRefresh();
   }, msUntilMidnight);
 }
+
+// App Map - visualize applications with errors
+function renderAppMap(events) {
+  const container = document.getElementById('appsMapContainer');
+  if (!container) return;
+  
+  // Исключаем системные процессы из карты приложений
+  const systemProcesses = ['kernel', 'launchd', 'systemd', 'init', 'cron', 'rsyslog', 'journald', 'networkd', 'udev', 'dbus', 'polkit', 'networkd'];
+  
+  // Filter events with errors/crashes from applications
+  const appErrors = events.filter(ev => {
+    const msg = (ev.message || '').toLowerCase();
+    const type = (ev.event_type || '').toLowerCase();
+    const raw = ev.raw_data || {};
+    const process = raw.process || raw.service || raw.application || ev.source_category || '';
+    
+    // Исключаем системные процессы
+    if (systemProcesses.some(sys => process.toLowerCase().includes(sys))) {
+      return false;
+    }
+    
+    return type === 'service' || 
+           msg.includes('crash') || 
+           msg.includes('error') || 
+           msg.includes('fail') ||
+           msg.includes('exit');
+  });
+  
+  // Group by application/service
+  const appCounts = {};
+  for (const ev of appErrors) {
+    // Get app name from raw_data or message
+    const raw = ev.raw_data || {};
+    let appName = raw.process || raw.service || raw.application || ev.source_category || 'Unknown';
+    
+    // Try to extract from message if it contains "app.service:" pattern
+    if (!appName || appName === 'Unknown') {
+      const match = (ev.message || '').match(/([a-zA-Z0-9_-]+)\.service:/);
+      if (match) {
+        appName = match[1];
+      }
+    }
+    
+    if (!appCounts[appName]) {
+      appCounts[appName] = { count: 0, severity: 'low', errors: [] };
+    }
+    appCounts[appName].count++;
+    
+    // Track highest severity
+    const sevOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+    if (sevOrder[ev.severity] < sevOrder[appCounts[appName].severity]) {
+      appCounts[appName].severity = ev.severity;
+    }
+    
+    appCounts[appName].errors.push(ev);
+  }
+  
+  container.innerHTML = '';
+  
+  const apps = Object.entries(appCounts).sort((a, b) => b[1].count - a[1].count);
+  
+  if (apps.length === 0) {
+    container.innerHTML = '<div class="app-error-empty">Ошибки приложений не обнаружены<br><small>Показываются только ошибки пользовательских приложений (не kernel/launchd)</small></div>';
+    return;
+  }
+  
+  // App icon mapping
+  const appIcons = {
+    'nginx': '🌐',
+    'apache': '🌐',
+    'mysql': '🗄️',
+    'postgres': '🗄️',
+    'redis': '🗄️',
+    'sshd': '🔐',
+    'docker': '🐳',
+    'zoom': '📹',
+    'slack': '💬',
+    'code': '💻',
+    'unknown': '⚠️'
+  };
+  
+  for (const [appName, data] of apps) {
+    const icon = appIcons[appName.toLowerCase()] || appIcons['unknown'];
+    const node = document.createElement('div');
+    node.className = `app-node ${data.severity}`;
+    node.innerHTML = `
+      <div class="app-node-icon ${data.severity}">${icon}</div>
+      <div class="app-node-name">${escapeHtml(appName)}</div>
+      <div class="app-node-count">${data.count} ош.</div>
+    `;
+    node.addEventListener('click', () => {
+      showAppErrors(data.errors, appName);
+    });
+    container.appendChild(node);
+  }
+}
+
+// Show app errors in table
+function renderAppErrorsTable(events) {
+  const tbody = document.getElementById('appErrorsList');
+  if (!tbody) return;
+  
+  tbody.innerHTML = '';
+  
+  // Filter and sort recent errors
+  const errors = events
+    .filter(ev => {
+      const msg = (ev.message || '').toLowerCase();
+      const type = (ev.event_type || '').toLowerCase();
+      return type === 'service' || msg.includes('error') || msg.includes('fail') || msg.includes('crash');
+    })
+    .sort((a, b) => new Date(b.ts) - new Date(a.ts))
+    .slice(0, 20);
+  
+  if (errors.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="app-error-empty">Нет недавних ошибок</td></tr>';
+    return;
+  }
+  
+  for (const ev of errors) {
+    const dt = ev.ts ? new Date(ev.ts) : null;
+    const timeStr = dt ? dt.toLocaleTimeString('ru-RU', { timeStyle: 'short' }) : '—';
+    
+    const raw = ev.raw_data || {};
+    let appName = raw.process || raw.service || raw.application || ev.source_category || 'Unknown';
+    
+    // Truncate message
+    let errorMsg = ev.message || '';
+    if (errorMsg.length > 80) {
+      errorMsg = errorMsg.substring(0, 77) + '...';
+    }
+    
+    const sevLabel = SEVERITY_LABELS[ev.severity] || ev.severity;
+    const sevClass = `detail-sev-${ev.severity}`;
+    
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(timeStr)}</td>
+      <td>${escapeHtml(appName)}</td>
+      <td>${escapeHtml(errorMsg)}</td>
+      <td><span class="detail-sev-badge ${sevClass}">${escapeHtml(sevLabel)}</span></td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+// Show errors for specific app
+function showAppErrors(errors, appName) {
+  // Open detail view filtered by app
+  const mainView = document.getElementById('mainView');
+  const detailView = document.getElementById('detailView');
+  const titleEl = document.getElementById('drilldownTitle');
+  const breadcrumbs = document.getElementById('detailBreadcrumbs');
+  
+  drilldownSeverity = null; // Show all severities
+  drilldownQuery = appName.toLowerCase();
+  
+  if (titleEl) titleEl.textContent = `Ошибки: ${appName}`;
+  if (breadcrumbs) breadcrumbs.textContent = `Карта / ${appName}`;
+  
+  const searchEl = document.getElementById('detailSearchInput');
+  if (searchEl) searchEl.value = appName;
+  
+  // Filter incidents by app name
+  const filtered = allIncidents.filter(inc => {
+    const details = inc.details || {};
+    const service = details.service || details.process || details.application || '';
+    return service.toLowerCase().includes(drilldownQuery);
+  });
+  
+  renderDrilldownList(filtered);
+
+  if (mainView) mainView.classList.add('hidden');
+  if (detailView) {
+    detailView.classList.remove('hidden');
+    detailView.setAttribute('aria-hidden', 'false');
+  }
+}
+
+// Save state before app closes
+window.addEventListener('beforeunload', () => {
+  // Credentials are already in localStorage, but ensure they're saved
+  if (currentUser) {
+    const creds = localStorage.getItem(AUTH_CREDS_KEY);
+    if (creds) {
+      localStorage.setItem(AUTH_CREDS_KEY, creds);
+    }
+  }
+});

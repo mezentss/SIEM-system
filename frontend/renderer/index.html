@@ -12,6 +12,7 @@
       <div class="topbar-title">Система мониторинга SIEM</div>
       <nav class="topbar-nav" aria-label="Навигация">
         <button class="topbar-nav-item topbar-nav-item-active" data-view="dashboard" type="button">Панель</button>
+        <button class="topbar-nav-item" data-view="map" type="button">Карта</button>
         <button class="topbar-nav-item" data-view="reports" type="button">Отчёты</button>
         <button class="topbar-nav-item" data-view="settings" type="button">Настройки</button>
         <button class="topbar-nav-item" data-view="employee" type="button">Сотрудник</button>
@@ -150,6 +151,42 @@
               <h2>Информация для сотрудника</h2>
             </div>
             <p>Текущий статус системы и рекомендации по безопасности.</p>
+          </section>
+        </div>
+
+        <!-- Map view -->
+        <div id="mapView" class="view-content hidden">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Карта приложений с ошибками</h2>
+            </div>
+            <p class="section-hint">Визуализация приложений и служб, в которых происходят сбои. Размер круга показывает количество ошибок.</p>
+          </section>
+          
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Приложения</h2>
+            </div>
+            <div id="appsMapContainer" class="apps-map-container"></div>
+          </section>
+          
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Последние ошибки приложений</h2>
+            </div>
+            <div class="events-table-container">
+              <table class="events-table">
+                <thead>
+                  <tr>
+                    <th>Время</th>
+                    <th>Приложение</th>
+                    <th>Ошибка</th>
+                    <th>Серьёзность</th>
+                  </tr>
+                </thead>
+                <tbody id="appErrorsList"></tbody>
+              </table>
+            </div>
           </section>
         </div>
       </main>

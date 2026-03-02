@@ -55,9 +55,7 @@ class IncidentService:
         saved_count = self._repo.add_many(db, incidents)
 
         for incident in incidents:
-            # Не отправляем уведомление, если такой тип инцидента уже был за последние 2 часа
-            if incident.incident_type in recent_incident_types:
-                continue
+            # Отправляем уведомление для каждого нового инцидента
             try:
                 self._notification_service.notify_incident(db, incident)
             except Exception:

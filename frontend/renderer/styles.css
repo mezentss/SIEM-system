@@ -998,3 +998,66 @@ header h1 {
   padding: 3rem;
   font-size: 1rem;
 }
+
+/* Admin-only columns */
+.admin-only {
+  display: table-cell;
+}
+
+body.operator .admin-only {
+  display: none;
+}
+
+/* Operator-only columns */
+.operator-only {
+  display: none;
+}
+
+body.operator .operator-only {
+  display: table-cell;
+}
+
+/* Advice badge styles */
+.advice-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  cursor: help;
+  transition: all 0.2s ease;
+}
+
+.advice-badge:hover {
+  background: var(--bg-card);
+  border-color: var(--accent-blue);
+}
+
+.advice-badge.critical {
+  background: rgba(237, 66, 70, 0.15);
+  border-color: var(--severity-critical);
+  color: var(--severity-critical);
+}
+
+.advice-badge.high {
+  background: rgba(250, 116, 21, 0.15);
+  border-color: var(--severity-high);
+  color: var(--severity-high);
+}
+
+.advice-badge.medium {
+  background: rgba(236, 179, 12, 0.15);
+  border-color: var(--severity-medium);
+  color: var(--severity-medium);
+}
+
+.advice-badge.low {
+  background: rgba(60, 131, 247, 0.15);
+  border-color: var(--severity-low);
+  color: var(--severity-low);
+}

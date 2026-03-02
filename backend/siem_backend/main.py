@@ -4,6 +4,7 @@ from siem_backend.api.router import api_router
 from siem_backend.core.config import settings
 from siem_backend.core.logging import configure_logging
 from siem_backend.data.db import init_db
+from siem_backend.services import scheduler  # Запускает фоновый планировщик
 
 
 def create_app() -> FastAPI:

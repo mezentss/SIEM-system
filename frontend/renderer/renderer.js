@@ -671,17 +671,49 @@ function renderDrilldownList(incidents) {
       sev === 'low' ? 'detail-sev-low' :
       '';
 
+    // Получаем совет для оператора
+    const advice = getAdviceForSeverity(sev);
+    const adviceText = advice?.short || 'Нет рекомендаций';
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${escapeHtml(dateStr)}</td>
       <td>${escapeHtml(timeStr)}</td>
-      <td>${escapeHtml(type)}</td>
+      <td class="admin-only">${escapeHtml(type)}</td>
       <td><span class="detail-sev-badge ${sevClass}">${escapeHtml(sevLabel)}</span></td>
       <td>${escapeHtml(program)}</td>
-      <td>${escapeHtml(inc.friendly_description || inc.description || '')}</td>
+      <td class="admin-only">${escapeHtml(inc.friendly_description || inc.description || '')}</td>
+      <td class="operator-only"><span class="advice-badge ${sev}" title="${escapeHtml(advice?.full || adviceText)}">${advice?.icon || 'ℹ️'} ${escapeHtml(adviceText)}</span></td>
     `;
     tbody.appendChild(tr);
   }
+}
+
+// Получение совета по уровню серьёзности
+function getAdviceForSeverity(severity) {
+  const advices = {
+    'critical': { 
+      icon: '🆘', 
+      short: '1. Сохраните файлы → 2. Не выключайте ПК → 3. Звоните: +7 (999) 123-45-67', 
+      full: 'ЧТО ДЕЛАТЬ НЕМЕДЛЕННО:\n1. Сохраните все открытые файлы\n2. Не выключайте компьютер принудительно\n3. Запишите код ошибки (если есть)\n4. ЗВОНИТЕ: +7 (999) 123-45-67' 
+    },
+    'high': { 
+      icon: '🚨', 
+      short: '1. Сохраните файлы → 2. Перезагрузите ПК → 3. Если не помогло — звоните', 
+      full: 'ПЛАН ДЕЙСТВИЙ:\n1. Сохраните все файлы\n2. Закройте приложение с ошибками\n3. Перезагрузите компьютер\n4. Если проблема повторилась — звоните: +7 (999) 123-45-67' 
+    },
+    'medium': { 
+      icon: '⚠️', 
+      short: '1. Перезапустите приложение → 2. Проверьте интернет → 3. Перезагрузите ПК', 
+      full: 'ПОПРОБУЙТЕ:\n1. Перезапустите приложение\n2. Проверьте подключение к интернету\n3. Перезагрузите компьютер\n\nЕсли повторится — обратитесь в поддержку' 
+    },
+    'low': { 
+      icon: 'ℹ️', 
+      short: 'Продолжайте работу. Если повторится — перезапустите приложение', 
+      full: 'Всё в порядке.\n\nПродолжайте работу в обычном режиме.\n\nЕсли ошибка повторится несколько раз — перезапустите приложение.' 
+    },
+  };
+  return advices[severity] || advices['low'];
 }
 
 function escapeHtml(str) {
@@ -961,6 +993,10 @@ if (window.location.pathname.endsWith('login.html')) {
       const roleEl = document.getElementById('topbarRole');
       if (usernameEl) usernameEl.textContent = user.username || '—';
       if (roleEl) roleEl.textContent = user.role === 'admin' ? 'Администратор' : 'Сотрудник';
+      
+      // Добавляем класс роли к body для CSS
+      document.body.classList.add(user.role === 'admin' ? 'admin' : 'operator');
+      
       if (user.role === 'admin') {
         // Show all controls
         document.querySelectorAll('[data-require-admin]').forEach(el => el.style.display = '');
@@ -991,24 +1027,16 @@ if (window.location.pathname.endsWith('login.html')) {
 
 // Start polling for all authenticated users
 function startPolling() {
-  // Initial collection for admin users
-  if (currentUser && currentUser.role === 'admin') {
-    collectFileEventsSilent();
-  }
-
   // Polling every 10 seconds for incidents and chart updates
   setInterval(async () => {
     // Only run if user is authenticated
     if (!currentUser) return;
 
-    // Run analysis only for admins (non-admins get 403)
+    // Run analysis for admins only (to create incidents and send Telegram notifications)
     if (currentUser.role === 'admin') {
       try {
         await apiCall('/api/analyze/run?since_minutes=60', { method: 'POST' });
       } catch (_) {}
-
-      // Collect new events periodically (for admin only)
-      await collectFileEventsSilent();
     }
 
     // Load data for all users

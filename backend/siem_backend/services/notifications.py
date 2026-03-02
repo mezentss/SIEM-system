@@ -105,6 +105,27 @@ def incident_text_ru(incident: Incident) -> str:
     return "Обнаружен инцидент безопасности"
 
 
+def get_telegram_advice(severity: str) -> str:
+    """Возвращает текст совета для Telegram (только critical и high)."""
+    if severity == "critical":
+        return """ЧТО ДЕЛАТЬ НЕМЕДЛЕННО:
+1. Сохраните все открытые файлы
+2. Не выключайте компьютер принудительно
+3. Запишите код ошибки (если есть)
+4. ЗВОНИТЕ: +7 (999) 123-45-67
+
+⏰ Не откладывайте!"""
+    elif severity == "high":
+        return """ПЛАН ДЕЙСТВИЙ:
+1. Сохраните все файлы
+2. Закройте приложение с ошибками
+3. Перезагрузите компьютер
+4. Если проблема повторилась — звоните: +7 (999) 123-45-67
+
+⏰ Решите в ближайшее время"""
+    return ""
+
+
 def critical_event_text_ru(event: Event) -> str:
     service = event.raw_data.get("service") if isinstance(event.raw_data, dict) else None
     if service:
@@ -176,12 +197,15 @@ class NotificationService:
 
     def notify_incident(self, db: Session, incident: Incident) -> Notification:
         text = incident_text_ru(incident)
+        # Добавляем совет для Telegram (только critical и high)
+        telegram_advice = get_telegram_advice(incident.severity)
+        message_for_telegram = f"{text}\n\n{telegram_advice}" if telegram_advice else text
         return self.create_notification(
             db=db,
             notification_type="incident",
             severity=incident.severity,
             title=text,
-            message=text,
+            message=message_for_telegram,
             incident_id=incident.id,
             event_id=incident.event_id,
             details=incident.details,

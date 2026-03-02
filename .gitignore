@@ -27,8 +27,13 @@ build/
 .idea/
 .vscode/
 
+# ===== Documentation =====
+documents/
+*.tex
+*.pdf
+*.docx
+*.odt
+
 siem.db
 logs
-
-# ===== Development notes =====
 DEV_NOTES.md

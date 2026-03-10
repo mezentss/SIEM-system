@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import datetime as dt
 from typing import List
 
@@ -47,7 +45,6 @@ class RepeatedNetworkErrorsRule(BaseRule):
         if count < self._threshold:
             return []
 
-        # Определяем серьёзность на основе количества событий
         severity = "low"
         if count >= 200:
             severity = "critical"

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import datetime as dt
 import re
 from pathlib import Path
@@ -70,14 +68,12 @@ class FileLogCollector(LogCollector):
 
         text = raw_line or msg or ""
 
-        # Check for service name in message (e.g., "nginx.service:" in systemd logs)
         service_in_msg_match = re.search(r"\b([a-zA-Z0-9_-]+)\.service:", msg or "")
         if service_in_msg_match:
             service_name = service_in_msg_match.group(1)
             if is_meaningful(service_name):
                 return service_name
 
-        # Format: "2026-02-21 12:00:00,000 ERROR zoom[1234]: message"
         iso_format_match = re.match(
             r"^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d+\s+\w+\s+(?P<proc>[^\s\[]+)(?:\[(?P<pid>\d+)\])?:\s+.*$",
             text,
@@ -87,7 +83,6 @@ class FileLogCollector(LogCollector):
             if is_meaningful(proc):
                 return proc
 
-        # Full syslog line: "Jan 16 12:34:56 host process[pid]: message"
         m_full = re.match(
             r"^(?:[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+)?(?P<host>\S+)\s+(?P<proc>[^\s\[]+)(?:\[(?P<pid>\d+)\])?:\s+.*$",
             text,
@@ -97,7 +92,6 @@ class FileLogCollector(LogCollector):
             if is_meaningful(proc):
                 return proc
 
-        # Msg without timestamp: "host process[pid]: message"
         m_msg = re.match(
             r"^(?P<host>\S+)\s+(?P<proc>[^\s\[]+)(?:\[(?P<pid>\d+)\])?:\s+.*$",
             msg or "",
@@ -107,7 +101,6 @@ class FileLogCollector(LogCollector):
             if is_meaningful(proc):
                 return proc
 
-        # Fallback: "proc[pid]: message" or "proc: message"
         m_proc = re.match(r"^\s*(?P<proc>[^\s:]+?)(?:\[\d+\])?:\s+.*$", text)
         if m_proc:
             proc = m_proc.group("proc")
@@ -117,7 +110,6 @@ class FileLogCollector(LogCollector):
         return ""
 
     def _determine_severity(self, message: str) -> str:
-        """Определяет уровень важности на основе сообщения."""
         msg_lower = message.lower()
         if any(kw in msg_lower for kw in ["error", "failed", "failure", "denied", "refused"]):
             return "high"
@@ -128,10 +120,6 @@ class FileLogCollector(LogCollector):
         return "low"
 
     def _parse_line(self, line: str) -> Tuple[str, str]:
-        # Supported formats (best-effort):
-        # - ISO: 2026-01-16T12:34:56Z message
-        # - syslog-like: Jan 16 12:34:56 hostname process[pid]: message
-
         iso_match = re.match(
             r"^(?P<ts>\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)\s+(?P<msg>.*)$",
             line,

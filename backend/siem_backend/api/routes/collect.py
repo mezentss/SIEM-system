@@ -1,13 +1,13 @@
-from __future__ import annotations
+import os
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from siem_backend.api.auth import require_admin
+from siem_backend.data.db import get_db
 from siem_backend.services.collectors.file import FileLogCollector
 from siem_backend.services.collectors.macos import MacOSLogCollector, normalized_event_to_dict
 from siem_backend.services.collectors.mock import MockLogCollector
-from siem_backend.data.db import get_db
 from siem_backend.services.event_service import EventService
 from siem_backend.services.system_log_exporter import SystemLogExporter
 
@@ -38,10 +38,7 @@ def collect_file(
     db: Session = Depends(get_db),
     _ = Depends(require_admin),
 ) -> dict:
-    import os
-    # Если путь не указан, используем путь относительно backend директории
     if not file_path:
-        # backend/siem_backend/api/routes/ -> backend/
         backend_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
         file_path = os.path.join(backend_dir, "logs", "system.log")
     
@@ -78,22 +75,6 @@ def collect_system(
     db: Session = Depends(get_db),
     _ = Depends(require_admin),
 ) -> dict:
-    """
-    Собирает реальные логи macOS и сохраняет события в БД.
-
-    Процесс:
-    1. Экспортирует системные логи macOS в backend/logs/system.log
-    2. Читает файл через FileLogCollector
-    3. Сохраняет события в БД
-
-    Args:
-        last_minutes: Количество минут для получения логов (1-60)
-        max_lines: Максимальное количество строк для обработки (1-5000)
-
-    Returns:
-        Словарь с результатами экспорта и сбора
-    """
-    # Шаг 1: Экспорт логов ОС в файл
     exporter = SystemLogExporter(output_file="./logs/system.log")
     exported = exporter.export_logs(last_minutes=last_minutes)
 
@@ -105,11 +86,9 @@ def collect_system(
             "error": "Failed to export system logs",
         }
 
-    # Шаг 2: Чтение файла через FileLogCollector
     collector = FileLogCollector(file_path="./logs/system.log", max_lines=max_lines)
     events = collector.collect()
 
-    # Шаг 3: Сохранение событий в БД
     saved_count = EventService().save_normalized_events(db, events)
 
     return {

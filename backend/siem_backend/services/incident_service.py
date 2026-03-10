@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import datetime as dt
 from typing import Any, Dict, List, Optional
 
@@ -39,7 +37,6 @@ class IncidentService:
             if c.event_id is None or (c.event_id, c.incident_type) not in existing_pairs
         ]
 
-        # Проверяем, какие типы инцидентов уже были отправлены за последние 2 часа
         recent_incident_types = self._repo.get_recent_incident_types(db, since_minutes=120)
 
         event_by_id: Dict[int, Event] = {}
@@ -55,7 +52,6 @@ class IncidentService:
         saved_count = self._repo.add_many(db, incidents)
 
         for incident in incidents:
-            # Отправляем уведомление для каждого нового инцидента
             try:
                 self._notification_service.notify_incident(db, incident)
             except Exception:

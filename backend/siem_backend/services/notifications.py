@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
@@ -106,7 +104,6 @@ def incident_text_ru(incident: Incident) -> str:
 
 
 def get_telegram_advice(severity: str) -> str:
-    """Возвращает текст совета для Telegram (только critical и high)."""
     if severity == "critical":
         return """ЧТО ДЕЛАТЬ НЕМЕДЛЕННО:
 1. Сохраните все открытые файлы
@@ -197,7 +194,6 @@ class NotificationService:
 
     def notify_incident(self, db: Session, incident: Incident) -> Notification:
         text = incident_text_ru(incident)
-        # Добавляем совет для Telegram (только critical и high)
         telegram_advice = get_telegram_advice(incident.severity)
         message_for_telegram = f"{text}\n\n{telegram_advice}" if telegram_advice else text
         return self.create_notification(

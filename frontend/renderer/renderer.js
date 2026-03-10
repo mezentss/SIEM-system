@@ -12,12 +12,15 @@ let drilldownQuery = '';
 
 let currentUser = null;
 
+let fastPollingUntil = 0;
+const FAST_POLL_INTERVAL_MS = 10000;
+const SLOW_POLL_INTERVAL_MS = 5 * 60 * 1000;
+const FAST_POLL_DURATION_MS = 60 * 1000;
+
 function getAuthHeaders() {
   const creds = localStorage.getItem(AUTH_CREDS_KEY);
-  console.log('[DEBUG] Retrieved creds from localStorage:', creds ? 'found' : 'not found');
   if (!creds) return {};
   const [username, password] = atob(creds).split(':');
-  console.log('[DEBUG] Parsed username:', username, 'password length:', password ? password.length : 0);
   return {
     Authorization: 'Basic ' + btoa(username + ':' + password)
   };
@@ -29,16 +32,11 @@ async function apiCall(url, options = {}) {
     headers: { ...getAuthHeaders(), ...(options.headers || {}) },
     ...options,
   });
-  console.log('[DEBUG] fetch response:', resp);
-  // If electronAPI.fetch returns parsed JSON directly
   if (resp && typeof resp === 'object' && !resp.status && !resp.statusCode) {
-    // Assume it's already parsed JSON and successful
     return resp;
   }
-  // Handle normal fetch Response object
   const status = resp.status ?? resp.statusCode ?? resp.ok ? 200 : 500;
   const statusText = resp.statusText ?? resp.statusMessage ?? '';
-  console.log('[DEBUG] status:', status, 'statusText:', statusText);
   if (status !== 200) {
     if (status === 401) {
       logout();
@@ -46,7 +44,6 @@ async function apiCall(url, options = {}) {
     throw new Error(`HTTP ${status}: ${statusText}`);
   }
   const text = await resp.text();
-  console.log('[DEBUG] response text:', text);
   try {
     return JSON.parse(text);
   } catch (_) {
@@ -103,12 +100,10 @@ function isSameDay(a, b) {
 }
 
 function updateDashboardStats({ events = [], incidents = [] } = {}) {
-  const totalEventsEl = document.getElementById('statTotalEvents');
   const activeIncidentsEl = document.getElementById('statActiveIncidents');
   const alertsTodayEl = document.getElementById('statAlertsToday');
   const healthEl = document.getElementById('statSystemHealth');
 
-  const totalEvents = Array.isArray(events) ? events.length : 0;
   const totalIncidents = Array.isArray(incidents) ? incidents.length : 0;
 
   const now = new Date();
@@ -121,7 +116,6 @@ function updateDashboardStats({ events = [], incidents = [] } = {}) {
     (inc) => (inc?.severity || '').toLowerCase() === 'critical'
   );
 
-  if (totalEventsEl) totalEventsEl.textContent = formatNumberRu(totalEvents);
   if (activeIncidentsEl) activeIncidentsEl.textContent = formatNumberRu(totalIncidents);
   if (alertsTodayEl) alertsTodayEl.textContent = formatNumberRu(incidentsToday);
 
@@ -228,14 +222,13 @@ async function loadEventsHistory() {
       const dt = ev.ts ? new Date(ev.ts) : null;
       const timeStr = dt ? dt.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'medium' }) : '—';
       const title = `${ev.event_type || ''} [${ev.severity || ''}]`.trim();
-      
-      // Translate source category
+
       const sourceCat = {
         'service': 'Сервис',
         'user_process': 'Приложение',
         'os': 'ОС'
       }[ev.source_category] || ev.source_category;
-      
+
       const meta = `${timeStr} · ${sourceCat} · ${ev.source_os || ''}`;
       const item = document.createElement('div');
       item.className = 'history-item';
@@ -302,7 +295,6 @@ function severityOrder(s) {
 }
 
 function buildSeverityCounts(incidents) {
-  // Инициализируем все категории с нулём
   const counts = { critical: 0, high: 0, medium: 0, low: 0 };
   for (const inc of incidents) {
     const s = (inc.severity || 'unknown').toLowerCase();
@@ -312,14 +304,13 @@ function buildSeverityCounts(incidents) {
       counts.unknown = (counts.unknown || 0) + 1;
     }
   }
-  // Возвращаем в порядке важности
   const order = ['critical', 'high', 'medium', 'low'];
   return order.map(s => [s, counts[s] || 0]);
 }
 
 const SEVERITY_COLORS = {
   critical: '#ed4246',
-  high: '#fa7415', 
+  high: '#fa7415',
   medium: '#ecb30c',
   low: '#3c83f7',
   warning: '#6c757d',
@@ -336,15 +327,13 @@ const SEVERITY_LABELS = {
 };
 
 function buildEventsByHour(events) {
-  // Показываем события за последние 24 часа с группировкой по часам
   const now = new Date();
-  const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 часа назад
+  const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const buckets = {};
   for (const ev of events) {
     if (!ev.ts) continue;
     const ts = new Date(ev.ts);
     if (ts < cutoff) continue;
-    // Округляем до часа для группировки
     const hour = new Date(ts);
     hour.setMinutes(0, 0, 0);
     const moscowMs = hour.getTime() + 3 * 60 * 60 * 1000;
@@ -363,11 +352,10 @@ function buildEventsByHour(events) {
       buckets[label][s] += 1;
     }
   }
-  // Сортируем метки по убыванию (новые слева)
   const labels = Object.keys(buckets).sort((a, b) => {
     const da = new Date(a);
     const db = new Date(b);
-    return db - da; // Обратный порядок - новые слева
+    return db - da;
   });
   return { labels, buckets };
 }
@@ -413,7 +401,6 @@ function renderEventsByHourChart(data) {
   const step = Math.max(1, Math.floor(labels.length / 6));
   labels.forEach((label, i) => {
     if (i % step !== 0 && i !== labels.length - 1) return;
-    // Позиция метки соответствует столбцу (справа налево)
     const x = paddingLeft + plotWidth - (i + 1) * (barWidth + gap) + gap + barWidth / 2;
     const text = label;
     ctx.save();
@@ -424,7 +411,6 @@ function renderEventsByHourChart(data) {
   });
   labels.forEach((label, i) => {
     const b = data.buckets[label];
-    // Рисуем столбцы справа налево (новые слева)
     const x = paddingLeft + plotWidth - (i + 1) * (barWidth + gap) + gap;
     let y = paddingTop + plotHeight;
     function drawStack(count, color) {
@@ -449,15 +435,14 @@ function renderSeverityChart(counts) {
     container.innerHTML = '<p class="chart-empty">Нет инцидентов для отображения.</p>';
     return;
   }
-  
-  // Фильтруем только ненулевые значения для диаграммы
+
   const nonZeroCounts = counts.filter(([, n]) => n > 0);
-  
+
   if (nonZeroCounts.length === 0) {
     container.innerHTML = '<p class="chart-empty">Нет инцидентов для отображения.</p>';
     return;
   }
-  
+
   const total = nonZeroCounts.reduce((s, [, n]) => s + n, 0);
   const size = 280;
   const canvas = document.createElement('canvas');
@@ -513,7 +498,6 @@ function renderSeverityChart(counts) {
   container.appendChild(canvas);
   const legend = document.createElement('div');
   legend.className = 'pie-legend';
-  // Показываем все категории в легенде (включая нулевые)
   for (const [severity, count] of counts) {
     const item = document.createElement('button');
     item.type = 'button';
@@ -671,7 +655,6 @@ function renderDrilldownList(incidents) {
       sev === 'low' ? 'detail-sev-low' :
       '';
 
-    // Получаем совет для оператора
     const advice = getAdviceForSeverity(sev);
     const adviceText = advice?.short || 'Нет рекомендаций';
 
@@ -689,28 +672,27 @@ function renderDrilldownList(incidents) {
   }
 }
 
-// Получение совета по уровню серьёзности
 function getAdviceForSeverity(severity) {
   const advices = {
-    'critical': { 
-      icon: '🆘', 
-      short: '1. Сохраните файлы → 2. Не выключайте ПК → 3. Звоните: +7 (999) 123-45-67', 
-      full: 'ЧТО ДЕЛАТЬ НЕМЕДЛЕННО:\n1. Сохраните все открытые файлы\n2. Не выключайте компьютер принудительно\n3. Запишите код ошибки (если есть)\n4. ЗВОНИТЕ: +7 (999) 123-45-67' 
+    'critical': {
+      icon: '🆘',
+      short: '1. Сохраните файлы → 2. Не выключайте ПК → 3. Звоните: +7 (999) 123-45-67',
+      full: 'ЧТО ДЕЛАТЬ НЕМЕДЛЕННО:\n1. Сохраните все открытые файлы\n2. Не выключайте компьютер принудительно\n3. Запишите код ошибки (если есть)\n4. ЗВОНИТЕ: +7 (999) 123-45-67'
     },
-    'high': { 
-      icon: '🚨', 
-      short: '1. Сохраните файлы → 2. Перезагрузите ПК → 3. Если не помогло — звоните', 
-      full: 'ПЛАН ДЕЙСТВИЙ:\n1. Сохраните все файлы\n2. Закройте приложение с ошибками\n3. Перезагрузите компьютер\n4. Если проблема повторилась — звоните: +7 (999) 123-45-67' 
+    'high': {
+      icon: '🚨',
+      short: '1. Сохраните файлы → 2. Перезагрузите ПК → 3. Если не помогло — звоните',
+      full: 'ПЛАН ДЕЙСТВИЙ:\n1. Сохраните все файлы\n2. Закройте приложение с ошибками\n3. Перезагрузите компьютер\n4. Если проблема повторилась — звоните: +7 (999) 123-45-67'
     },
-    'medium': { 
-      icon: '⚠️', 
-      short: '1. Перезапустите приложение → 2. Проверьте интернет → 3. Перезагрузите ПК', 
-      full: 'ПОПРОБУЙТЕ:\n1. Перезапустите приложение\n2. Проверьте подключение к интернету\n3. Перезагрузите компьютер\n\nЕсли повторится — обратитесь в поддержку' 
+    'medium': {
+      icon: '⚠️',
+      short: '1. Перезапустите приложение → 2. Проверьте интернет → 3. Перезагрузите ПК',
+      full: 'ПОПРОБУЙТЕ:\n1. Перезапустите приложение\n2. Проверьте подключение к интернету\n3. Перезагрузите компьютер\n\nЕсли повторится — обратитесь в поддержку'
     },
-    'low': { 
-      icon: 'ℹ️', 
-      short: 'Продолжайте работу. Если повторится — перезапустите приложение', 
-      full: 'Всё в порядке.\n\nПродолжайте работу в обычном режиме.\n\nЕсли ошибка повторится несколько раз — перезапустите приложение.' 
+    'low': {
+      icon: 'ℹ️',
+      short: 'Продолжайте работу. Если повторится — перезапустите приложение',
+      full: 'Всё в порядке.\n\nПродолжайте работу в обычном режиме.\n\nЕсли ошибка повторится несколько раз — перезапустите приложение.'
     },
   };
   return advices[severity] || advices['low'];
@@ -722,44 +704,6 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// Event type statistics
-function renderEventTypesStats(events) {
-  const container = document.getElementById('eventTypesContainer');
-  if (!container) return;
-  
-  const typeCounts = {};
-  events.forEach(ev => {
-    const type = ev.event_type || 'unknown';
-    typeCounts[type] = (typeCounts[type] || 0) + 1;
-  });
-  
-  container.innerHTML = '';
-  Object.entries(typeCounts).forEach(([type, count]) => {
-    const item = document.createElement('div');
-    item.className = 'event-type-item';
-
-    // Translate event types to Russian
-    const translatedType = {
-      'auth_failed': 'Аутентификация',
-      'auth_success': 'Аутентификация',
-      'authentication': 'Аутентификация',
-      'network_error': 'Сеть',
-      'network': 'Сеть',
-      'service_crash': 'Сервис',
-      'service': 'Сервис',
-      'process': 'Процесс',
-      'unknown': 'Неизвестно'
-    }[type] || type;
-
-    item.innerHTML = `
-      <div class="event-type-count">${count}</div>
-      <div class="event-type-label">${translatedType}</div>
-    `;
-    container.appendChild(item);
-  });
-}
-
-// Recent events table
 function renderRecentEvents(events) {
   const tbody = document.getElementById('recentEventsList');
   if (!tbody) return;
@@ -773,7 +717,6 @@ function renderRecentEvents(events) {
     const source = ev.source_category || '—';
     const status = ev.status === 'resolved' ? 'resolved' : 'active';
 
-    // Translate event types to Russian
     const translatedType = {
       'auth_failed': 'Аутентификация',
       'auth_success': 'Аутентификация',
@@ -786,7 +729,6 @@ function renderRecentEvents(events) {
       'unknown': 'Неизвестно'
     }[type] || type;
 
-    // Translate source categories to Russian
     const translatedSource = {
       'service': 'Сервис',
       'user_process': 'Приложение',
@@ -805,7 +747,6 @@ function renderRecentEvents(events) {
   });
 }
 
-// View switching
 function switchView(viewName) {
   const views = ['dashboard', 'map', 'reports', 'settings', 'employee'];
   const navItems = document.querySelectorAll('.topbar-nav-item');
@@ -856,18 +797,16 @@ async function loadIncidentsAndChart() {
     } catch (_) {
       eventsForStats = [];
     }
-    
-    renderEventTypesStats(eventsForStats);
+
     renderRecentEvents(eventsForStats);
     updateDashboardStats({ events: eventsForStats, incidents: allIncidents });
 
     const eventsData = buildEventsByHour(eventsForStats || []);
     renderEventsByHourChart(eventsData);
-    
-    // Render app map
+
     renderAppMap(eventsForStats);
     renderAppErrorsTable(eventsForStats);
-    
+
     await loadHistory();
   } catch (_) {
     const container = document.getElementById('chartContainer');
@@ -877,24 +816,23 @@ async function loadIncidentsAndChart() {
 
 document.addEventListener('DOMContentLoaded', () => {
   loadSeenIncidentIds();
-  
-  // Navigation handlers
+
   document.querySelectorAll('.topbar-nav-item').forEach(item => {
     item.addEventListener('click', () => {
       const view = item.getAttribute('data-view');
       if (view) switchView(view);
     });
   });
-  
+
   const loadEventsBtn = document.getElementById('loadEventsBtn');
   if (loadEventsBtn) loadEventsBtn.addEventListener('click', loadEvents);
-  
+
   const runAnalysisBtn = document.getElementById('runAnalysisBtn');
   if (runAnalysisBtn) runAnalysisBtn.addEventListener('click', runAnalysis);
-  
+
   const generateMockBtn = document.getElementById('generateMockBtn');
   if (generateMockBtn) generateMockBtn.addEventListener('click', collectFileEvents);
-  
+
   const backToChartBtn = document.getElementById('backToChartBtn');
   if (backToChartBtn) backToChartBtn.addEventListener('click', backToChart);
 
@@ -918,16 +856,37 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Start polling after authentication
   startPolling();
 });
 
-// Login page logic
 if (window.location.pathname.endsWith('login.html')) {
+  // Auth tabs switching
+  const authTabs = document.querySelectorAll('.auth-tab');
+  const loginForm = document.getElementById('loginForm');
+  const registerForm = document.getElementById('registerForm');
+  
+  authTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const tabName = tab.getAttribute('data-tab');
+      
+      authTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      
+      if (tabName === 'login') {
+        loginForm.classList.remove('hidden');
+        registerForm.classList.add('hidden');
+      } else {
+        loginForm.classList.add('hidden');
+        registerForm.classList.remove('hidden');
+      }
+    });
+  });
+
+  // Login form handler
   document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const username = document.getElementById('username').value;
-    const password = document.getElementById('password').value;
+    const username = document.getElementById('loginUsername').value;
+    const password = document.getElementById('loginPassword').value;
     const errorEl = document.getElementById('loginError');
     const btn = e.target.querySelector('button[type="submit"]');
 
@@ -936,211 +895,297 @@ if (window.location.pathname.endsWith('login.html')) {
 
     try {
       const creds = btoa(username + ':' + password);
-      console.log('[DEBUG] Saving credentials:', username, 'password length:', password.length);
       localStorage.setItem(AUTH_CREDS_KEY, creds);
-      console.log('[DEBUG] Credentials saved to localStorage');
 
-      // Verify credentials were saved
-      const savedCreds = localStorage.getItem(AUTH_CREDS_KEY);
-      console.log('[DEBUG] Verification - saved creds:', savedCreds ? 'match' : 'failed');
-
-      // Small delay to ensure localStorage is updated
       await new Promise(resolve => setTimeout(resolve, 100));
 
       const user = await apiCall('/api/auth/me');
-      console.log('[DEBUG] Login success, user:', user);
       currentUser = user;
-      console.log('[DEBUG] Redirecting to index.html');
       window.location.href = 'index.html';
     } catch (err) {
-      console.error('[DEBUG] Login error:', err);
       errorEl.textContent = 'Неверное имя пользователя или пароль';
       errorEl.classList.remove('hidden');
     } finally {
       btn.disabled = false;
     }
   });
-  
-  // Check for stored credentials on login page (auto-login)
+
+  // Register form handler
+  document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const username = document.getElementById('regUsername').value;
+    const password = document.getElementById('regPassword').value;
+    const fullName = document.getElementById('regFullName').value;
+    const email = document.getElementById('regEmail').value;
+    const phone = document.getElementById('regPhone').value;
+    
+    const errorEl = document.getElementById('registerError');
+    const successEl = document.getElementById('registerSuccess');
+    const btn = e.target.querySelector('button[type="submit"]');
+
+    btn.disabled = true;
+    errorEl.classList.add('hidden');
+    successEl.classList.add('hidden');
+
+    try {
+      const fetchFn = window.electronAPI?.fetch || window.fetch;
+      const resp = await fetchFn(API_BASE + '/api/profile/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: username,
+          password: password,
+          full_name: fullName || null,
+          email: email || null,
+          phone: phone || null,
+        }),
+      });
+
+      // electronAPI.fetch returns parsed JSON, regular fetch returns Response
+      let result;
+      if (resp && typeof resp === 'object' && !resp.status) {
+        result = resp;
+      } else {
+        if (!resp.ok) {
+          result = await resp.json().catch(() => ({ detail: 'Registration failed' }));
+          throw new Error(result.detail || 'Registration failed');
+        }
+        result = await resp.json();
+      }
+
+      successEl.textContent = '✓ Регистрация успешна! Теперь войдите.';
+      successEl.classList.remove('hidden');
+      
+      // Clear form
+      document.getElementById('regUsername').value = '';
+      document.getElementById('regPassword').value = '';
+      document.getElementById('regFullName').value = '';
+      document.getElementById('regEmail').value = '';
+      document.getElementById('regPhone').value = '';
+      
+      // Switch to login tab after 2 seconds
+      setTimeout(() => {
+        document.querySelector('[data-tab="login"]')?.click();
+      }, 2000);
+      
+    } catch (err) {
+      console.error('[REGISTER] Error:', err);
+      errorEl.textContent = err.message || 'Ошибка регистрации';
+      errorEl.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // Auto-login check
   (async () => {
     const storedCreds = localStorage.getItem(AUTH_CREDS_KEY);
     if (storedCreds) {
       try {
         const user = await apiCall('/api/auth/me');
-        console.log('[DEBUG] Auto-login success:', user);
         window.location.href = 'index.html';
       } catch (_) {
-        console.log('[DEBUG] Auto-login failed, showing login form');
       }
     }
   })();
 } else {
-  // Main app: check auth and role
   (async () => {
-    // Check if we have stored credentials
     const storedCreds = localStorage.getItem(AUTH_CREDS_KEY);
     if (!storedCreds) {
-      console.log('[DEBUG] No stored credentials, redirecting to login');
       logout();
       return;
     }
-    
+
     try {
       const user = await apiCall('/api/auth/me');
       currentUser = user;
-      // Update topbar
       const usernameEl = document.getElementById('topbarUsername');
       const roleEl = document.getElementById('topbarRole');
       if (usernameEl) usernameEl.textContent = user.username || '—';
       if (roleEl) roleEl.textContent = user.role === 'admin' ? 'Администратор' : 'Сотрудник';
-      
-      // Добавляем класс роли к body для CSS
+
       document.body.classList.add(user.role === 'admin' ? 'admin' : 'operator');
-      
+
       if (user.role === 'admin') {
-        // Show all controls
         document.querySelectorAll('[data-require-admin]').forEach(el => el.style.display = '');
       } else {
-        // Hide admin-only controls
         document.querySelectorAll('[data-require-admin]').forEach(el => el.style.display = 'none');
       }
 
-      // Load data after successful auth
       loadIncidentsAndChart();
       checkNewIncidents();
 
-      // Start polling for all users
       startPolling();
     } catch (err) {
-      console.error('[DEBUG] Auth check failed:', err);
-      // Only logout on 401 (unauthorized), not on network errors
-      // User stays logged in if backend is temporarily unavailable
     }
   })();
 
-  // Logout handler
   const logoutBtn = document.getElementById('logoutBtn');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', logout);
   }
+
+  // Employee profile form handler
+  const employeeForm = document.getElementById('employeeProfileForm');
+  if (employeeForm) {
+    employeeForm.addEventListener('submit', saveEmployeeProfile);
+  }
+
+  // Load profile when switching to employee view
+  document.querySelector('[data-view="employee"]')?.addEventListener('click', () => {
+    loadEmployeeProfile();
+  });
+
+  // Users management handlers (admin only)
+  const addUserBtn = document.getElementById('addUserBtn');
+  if (addUserBtn) {
+    addUserBtn.addEventListener('click', () => openUserModal());
+  }
+
+  const modalClose = document.getElementById('modalClose');
+  if (modalClose) {
+    modalClose.addEventListener('click', closeUserModal);
+  }
+
+  const modalCancel = document.getElementById('modalCancel');
+  if (modalCancel) {
+    modalCancel.addEventListener('click', closeUserModal);
+  }
+
+  const userForm = document.getElementById('userForm');
+  if (userForm) {
+    userForm.addEventListener('submit', saveUser);
+  }
+
+  // Load users when switching to settings view
+  document.querySelector('[data-view="settings"]')?.addEventListener('click', () => {
+    if (currentUser && currentUser.role === 'admin') {
+      loadUsersList();
+    }
+  });
 }
 
-// Start polling for all authenticated users
 function startPolling() {
-  // Polling every 10 seconds for incidents and chart updates
-  setInterval(async () => {
-    // Only run if user is authenticated
+  let pollingInterval = null;
+  
+  function startInterval(intervalMs) {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+    }
+    pollingInterval = setInterval(runPoll, intervalMs);
+  }
+  
+  function runPoll() {
     if (!currentUser) return;
-
-    // Run analysis for admins only (to create incidents and send Telegram notifications)
-    if (currentUser.role === 'admin') {
+    
+    const now = Date.now();
+    const isFastPolling = now < fastPollingUntil;
+    
+    if (currentUser.role === 'admin' && isFastPolling) {
       try {
-        await apiCall('/api/analyze/run?since_minutes=60', { method: 'POST' });
+        apiCall('/api/analyze/run?since_minutes=60', { method: 'POST' })
+          .catch(() => {});
       } catch (_) {}
     }
-
-    // Load data for all users
+    
     checkNewIncidents();
     loadIncidentsAndChart();
-  }, POLL_INTERVAL_MS);
-
-  // Schedule chart refresh at midnight (00:00)
+    
+    if (!isFastPolling && currentUser.role === 'admin') {
+      fastPollingUntil = Date.now() + FAST_POLL_DURATION_MS;
+      startInterval(FAST_POLL_INTERVAL_MS);
+    }
+  }
+  
+  if (currentUser.role === 'admin') {
+    fastPollingUntil = Date.now() + FAST_POLL_DURATION_MS;
+    startInterval(FAST_POLL_INTERVAL_MS);
+  } else {
+    startInterval(SLOW_POLL_INTERVAL_MS);
+  }
+  
   scheduleMidnightRefresh();
 }
 
-// Silent file collection (no UI output)
 async function collectFileEventsSilent() {
   try {
     await apiCall('/api/collect/file?max_lines=200', { method: 'POST' });
   } catch (_) {
-    // Ignore errors in silent mode
   }
 }
 
-// Schedule a refresh of the chart at midnight to start a new day
 function scheduleMidnightRefresh() {
   const now = new Date();
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
   tomorrow.setHours(0, 0, 0, 0);
-  
+
   const msUntilMidnight = tomorrow.getTime() - now.getTime();
-  
-  console.log('[DEBUG] Next chart refresh at midnight in', Math.round(msUntilMidnight / 1000), 'seconds');
-  
+
   setTimeout(() => {
     loadIncidentsAndChart();
-    // Schedule next midnight refresh
     scheduleMidnightRefresh();
   }, msUntilMidnight);
 }
 
-// App Map - visualize applications with errors
 function renderAppMap(events) {
   const container = document.getElementById('appsMapContainer');
   if (!container) return;
-  
-  // Исключаем системные процессы из карты приложений
+
   const systemProcesses = ['kernel', 'launchd', 'systemd', 'init', 'cron', 'rsyslog', 'journald', 'networkd', 'udev', 'dbus', 'polkit', 'networkd'];
-  
-  // Filter events with errors/crashes from applications
+
   const appErrors = events.filter(ev => {
     const msg = (ev.message || '').toLowerCase();
     const type = (ev.event_type || '').toLowerCase();
     const raw = ev.raw_data || {};
     const process = raw.process || raw.service || raw.application || ev.source_category || '';
-    
-    // Исключаем системные процессы
+
     if (systemProcesses.some(sys => process.toLowerCase().includes(sys))) {
       return false;
     }
-    
-    return type === 'service' || 
-           msg.includes('crash') || 
-           msg.includes('error') || 
+
+    return type === 'service' ||
+           msg.includes('crash') ||
+           msg.includes('error') ||
            msg.includes('fail') ||
            msg.includes('exit');
   });
-  
-  // Group by application/service
+
   const appCounts = {};
   for (const ev of appErrors) {
-    // Get app name from raw_data or message
     const raw = ev.raw_data || {};
     let appName = raw.process || raw.service || raw.application || ev.source_category || 'Unknown';
-    
-    // Try to extract from message if it contains "app.service:" pattern
+
     if (!appName || appName === 'Unknown') {
       const match = (ev.message || '').match(/([a-zA-Z0-9_-]+)\.service:/);
       if (match) {
         appName = match[1];
       }
     }
-    
+
     if (!appCounts[appName]) {
       appCounts[appName] = { count: 0, severity: 'low', errors: [] };
     }
     appCounts[appName].count++;
-    
-    // Track highest severity
+
     const sevOrder = { critical: 0, high: 1, medium: 2, low: 3 };
     if (sevOrder[ev.severity] < sevOrder[appCounts[appName].severity]) {
       appCounts[appName].severity = ev.severity;
     }
-    
+
     appCounts[appName].errors.push(ev);
   }
-  
+
   container.innerHTML = '';
-  
+
   const apps = Object.entries(appCounts).sort((a, b) => b[1].count - a[1].count);
-  
+
   if (apps.length === 0) {
     container.innerHTML = '<div class="app-error-empty">Ошибки приложений не обнаружены<br><small>Показываются только ошибки пользовательских приложений (не kernel/launchd)</small></div>';
     return;
   }
-  
-  // App icon mapping
+
   const appIcons = {
     'nginx': '🌐',
     'apache': '🌐',
@@ -1154,7 +1199,7 @@ function renderAppMap(events) {
     'code': '💻',
     'unknown': '⚠️'
   };
-  
+
   for (const [appName, data] of apps) {
     const icon = appIcons[appName.toLowerCase()] || appIcons['unknown'];
     const node = document.createElement('div');
@@ -1171,14 +1216,12 @@ function renderAppMap(events) {
   }
 }
 
-// Show app errors in table
 function renderAppErrorsTable(events) {
   const tbody = document.getElementById('appErrorsList');
   if (!tbody) return;
-  
+
   tbody.innerHTML = '';
-  
-  // Filter and sort recent errors
+
   const errors = events
     .filter(ev => {
       const msg = (ev.message || '').toLowerCase();
@@ -1187,28 +1230,27 @@ function renderAppErrorsTable(events) {
     })
     .sort((a, b) => new Date(b.ts) - new Date(a.ts))
     .slice(0, 20);
-  
+
   if (errors.length === 0) {
     tbody.innerHTML = '<tr><td colspan="4" class="app-error-empty">Нет недавних ошибок</td></tr>';
     return;
   }
-  
+
   for (const ev of errors) {
     const dt = ev.ts ? new Date(ev.ts) : null;
     const timeStr = dt ? dt.toLocaleTimeString('ru-RU', { timeStyle: 'short' }) : '—';
-    
+
     const raw = ev.raw_data || {};
     let appName = raw.process || raw.service || raw.application || ev.source_category || 'Unknown';
-    
-    // Truncate message
+
     let errorMsg = ev.message || '';
     if (errorMsg.length > 80) {
       errorMsg = errorMsg.substring(0, 77) + '...';
     }
-    
+
     const sevLabel = SEVERITY_LABELS[ev.severity] || ev.severity;
     const sevClass = `detail-sev-${ev.severity}`;
-    
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${escapeHtml(timeStr)}</td>
@@ -1220,30 +1262,27 @@ function renderAppErrorsTable(events) {
   }
 }
 
-// Show errors for specific app
 function showAppErrors(errors, appName) {
-  // Open detail view filtered by app
   const mainView = document.getElementById('mainView');
   const detailView = document.getElementById('detailView');
   const titleEl = document.getElementById('drilldownTitle');
   const breadcrumbs = document.getElementById('detailBreadcrumbs');
-  
-  drilldownSeverity = null; // Show all severities
+
+  drilldownSeverity = null;
   drilldownQuery = appName.toLowerCase();
-  
+
   if (titleEl) titleEl.textContent = `Ошибки: ${appName}`;
   if (breadcrumbs) breadcrumbs.textContent = `Карта / ${appName}`;
-  
+
   const searchEl = document.getElementById('detailSearchInput');
   if (searchEl) searchEl.value = appName;
-  
-  // Filter incidents by app name
+
   const filtered = allIncidents.filter(inc => {
     const details = inc.details || {};
     const service = details.service || details.process || details.application || '';
     return service.toLowerCase().includes(drilldownQuery);
   });
-  
+
   renderDrilldownList(filtered);
 
   if (mainView) mainView.classList.add('hidden');
@@ -1253,9 +1292,79 @@ function showAppErrors(errors, appName) {
   }
 }
 
-// Save state before app closes
+// Employee profile management
+async function loadEmployeeProfile() {
+  try {
+    const profile = await apiCall('/api/profile/me');
+    
+    // Display profile info
+    const profileUsernameEl = document.getElementById('profileUsername');
+    const profileRoleEl = document.getElementById('profileRole');
+    
+    if (profileUsernameEl) profileUsernameEl.textContent = profile.username || '—';
+    if (profileRoleEl) {
+      const roleText = profile.role === 'admin' ? 'Администратор' : 'Оператор';
+      profileRoleEl.textContent = roleText;
+    }
+    
+    // Fill form fields
+    const fullNameEl = document.getElementById('fullName');
+    const emailEl = document.getElementById('email');
+    const phoneEl = document.getElementById('phone');
+    
+    if (fullNameEl) fullNameEl.value = profile.full_name || '';
+    if (emailEl) emailEl.value = profile.email || '';
+    if (phoneEl) phoneEl.value = profile.phone || '';
+  } catch (err) {
+    console.error('[PROFILE] Failed to load profile:', err);
+  }
+}
+
+async function saveEmployeeProfile(event) {
+  event.preventDefault();
+
+  const saveStatusEl = document.getElementById('saveStatus');
+
+  try {
+    const profile = {
+      full_name: document.getElementById('fullName').value,
+      email: document.getElementById('email').value,
+      phone: document.getElementById('phone').value,
+    };
+
+    const creds = localStorage.getItem(AUTH_CREDS_KEY);
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (creds) {
+      const [username, password] = atob(creds).split(':');
+      headers['Authorization'] = 'Basic ' + btoa(username + ':' + password);
+    }
+
+    const fetchFn = window.electronAPI?.fetch || window.fetch;
+    const resp = await fetchFn(API_BASE + '/api/profile/me', {
+      method: 'PUT',
+      headers: headers,
+      body: JSON.stringify(profile),
+    });
+
+    if (saveStatusEl) {
+      saveStatusEl.textContent = '✓ Профиль сохранён';
+      saveStatusEl.classList.remove('error');
+      setTimeout(() => { saveStatusEl.textContent = ''; }, 3000);
+    }
+  } catch (err) {
+    console.error('[PROFILE] Failed to save profile:', err);
+    if (saveStatusEl) {
+      saveStatusEl.textContent = '✗ Ошибка сохранения';
+      saveStatusEl.classList.add('error');
+      setTimeout(() => { saveStatusEl.textContent = ''; }, 3000);
+    }
+  }
+}
+
 window.addEventListener('beforeunload', () => {
-  // Credentials are already in localStorage, but ensure they're saved
   if (currentUser) {
     const creds = localStorage.getItem(AUTH_CREDS_KEY);
     if (creds) {
@@ -1263,3 +1372,159 @@ window.addEventListener('beforeunload', () => {
     }
   }
 });
+
+// Users management
+async function loadUsersList() {
+  const tbody = document.getElementById('usersList');
+  if (!tbody) return;
+  
+  try {
+    const users = await apiCall('/api/users');
+    tbody.innerHTML = '';
+    
+    for (const user of users) {
+      const tr = document.createElement('tr');
+      const roleText = user.role === 'admin' ? 'Администратор' : 'Оператор';
+      const canDelete = user.username !== currentUser.username;
+      
+      tr.innerHTML = `
+        <td>${escapeHtml(user.username)}</td>
+        <td>${roleText}</td>
+        <td>${escapeHtml(user.full_name || '—')}</td>
+        <td>${escapeHtml(user.email || '—')}</td>
+        <td>${escapeHtml(user.phone || '—')}</td>
+        <td class="user-actions">
+          <button class="btn-edit" data-user-id="${user.id}">Ред.</button>
+          ${canDelete ? `<button class="btn-delete" data-user-id="${user.id}">Удал.</button>` : ''}
+        </td>
+      `;
+      tbody.appendChild(tr);
+    }
+    
+    // Add event listeners
+    tbody.querySelectorAll('.btn-edit').forEach(btn => {
+      btn.addEventListener('click', () => openUserModal(btn.dataset.userId));
+    });
+    
+    tbody.querySelectorAll('.btn-delete').forEach(btn => {
+      btn.addEventListener('click', () => deleteUser(btn.dataset.userId));
+    });
+  } catch (err) {
+    console.error('[USERS] Failed to load users:', err);
+  }
+}
+
+function openUserModal(userId = null) {
+  const modal = document.getElementById('userModal');
+  const form = document.getElementById('userForm');
+  const title = document.getElementById('modalTitle');
+  const errorEl = document.getElementById('userFormError');
+  
+  form.reset();
+  errorEl.classList.add('hidden');
+  document.getElementById('editUserId').value = '';
+  
+  if (userId) {
+    title.textContent = 'Редактировать пользователя';
+    document.getElementById('editUserId').value = userId;
+    // Load user data (simplified - would need to fetch user details)
+  } else {
+    title.textContent = 'Добавить пользователя';
+  }
+  
+  modal.classList.remove('hidden');
+}
+
+function closeUserModal() {
+  const modal = document.getElementById('userModal');
+  modal.classList.add('hidden');
+}
+
+async function saveUser(event) {
+  event.preventDefault();
+  
+  const userId = document.getElementById('editUserId').value;
+  const errorEl = document.getElementById('userFormError');
+  errorEl.classList.add('hidden');
+  
+  try {
+    const userData = {
+      username: document.getElementById('modalUsername').value,
+      password: document.getElementById('modalPassword').value || undefined,
+      role: document.getElementById('modalRole').value,
+      full_name: document.getElementById('modalFullName').value || null,
+      email: document.getElementById('modalEmail').value || null,
+      phone: document.getElementById('modalPhone').value || null,
+    };
+    
+    if (!userId && !userData.password) {
+      throw new Error('Пароль обязателен для нового пользователя');
+    }
+    
+    const url = userId ? `/api/users/${userId}` : '/api/users';
+    const method = userId ? 'PUT' : 'POST';
+    
+    const fetchFn = window.electronAPI?.fetch || window.fetch;
+    const headers = { 'Content-Type': 'application/json' };
+    const creds = localStorage.getItem(AUTH_CREDS_KEY);
+    if (creds) {
+      const [username, password] = atob(creds).split(':');
+      headers['Authorization'] = 'Basic ' + btoa(username + ':' + password);
+    }
+    
+    const resp = await fetchFn(API_BASE + url, {
+      method: method,
+      headers: headers,
+      body: JSON.stringify(userData),
+    });
+    
+    if (!resp.ok) {
+      const error = await resp.json().catch(() => ({ detail: 'Operation failed' }));
+      throw new Error(error.detail || 'Operation failed');
+    }
+    
+    closeUserModal();
+    loadUsersList();
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('hidden');
+  }
+}
+
+async function deleteUser(userId) {
+  if (!confirm('Вы уверены, что хотите удалить этого пользователя?')) {
+    return;
+  }
+  
+  try {
+    const fetchFn = window.electronAPI?.fetch || window.fetch;
+    const headers = { 'Content-Type': 'application/json' };
+    const creds = localStorage.getItem(AUTH_CREDS_KEY);
+    if (creds) {
+      const [username, password] = atob(creds).split(':');
+      headers['Authorization'] = 'Basic ' + btoa(username + ':' + password);
+    }
+    
+    const resp = await fetchFn(API_BASE + `/api/users/${userId}`, {
+      method: 'DELETE',
+      headers: headers,
+    });
+    
+    // electronAPI.fetch returns parsed JSON, regular fetch returns Response
+    let result;
+    if (resp && typeof resp === 'object' && !resp.status) {
+      result = resp;
+    } else {
+      if (!resp.ok) {
+        result = await resp.json().catch(() => ({ detail: 'Delete failed' }));
+        throw new Error(result.detail || 'Delete failed');
+      }
+      result = await resp.json();
+    }
+    
+    loadUsersList();
+  } catch (err) {
+    console.error('[USERS] Failed to delete user:', err);
+    alert('Ошибка удаления: ' + err.message);
+  }
+}

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import datetime as dt
 from typing import List
 
@@ -45,15 +43,9 @@ class MultipleFailedLoginsRule(BaseRule):
         if count < self._threshold:
             return []
 
-        severity = "low"
-        if count >= 30:
+        severity = "warning"
+        if count >= max(self._threshold * 2, 10):
             severity = "critical"
-        elif count >= 20:
-            severity = "high"
-        elif count >= 10:
-            severity = "medium"
-        elif count >= 5:
-            severity = "low"
 
         last_event_id = matched[-1].id if matched else None
 

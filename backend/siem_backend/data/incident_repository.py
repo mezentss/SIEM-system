@@ -1,7 +1,6 @@
-from __future__ import annotations
-
 from typing import Sequence, Set, Tuple
 
+import datetime as dt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -30,8 +29,6 @@ class IncidentRepository:
         return len(incidents)
 
     def get_recent_incident_types(self, db: Session, since_minutes: int = 120) -> Set[str]:
-        """Возвращает типы инцидентов, которые были созданы за последние N минут."""
-        import datetime as dt
         cutoff = dt.datetime.utcnow() - dt.timedelta(minutes=since_minutes)
         stmt = select(Incident.incident_type).where(
             Incident.detected_at >= cutoff,

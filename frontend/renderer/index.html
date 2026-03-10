@@ -14,7 +14,7 @@
         <button class="topbar-nav-item topbar-nav-item-active" data-view="dashboard" type="button">Панель</button>
         <button class="topbar-nav-item" data-view="map" type="button">Карта</button>
         <button class="topbar-nav-item" data-view="reports" type="button">Отчёты</button>
-        <button class="topbar-nav-item" data-view="settings" type="button">Настройки</button>
+        <button class="topbar-nav-item" data-view="settings" type="button" data-require-admin>Настройки</button>
         <button class="topbar-nav-item" data-view="employee" type="button">Сотрудник</button>
       </nav>
       <div class="topbar-user">
@@ -30,12 +30,6 @@
 
     <div id="mainView" class="view">
       <main>
-        <!-- Event type statistics -->
-        <section class="event-types-stats" aria-label="Статистика по типам событий">
-          <h3>События по типам</h3>
-          <div id="eventTypesContainer" class="event-types-chart"></div>
-        </section>
-
         <!-- Dashboard view -->
         <div id="dashboardView" class="view-content">
           <div class="controls">
@@ -45,10 +39,6 @@
           </div>
 
           <section class="stats-grid" aria-label="Ключевые показатели">
-            <div class="stat-card">
-              <div class="stat-label">Событий всего</div>
-              <div id="statTotalEvents" class="stat-value">—</div>
-            </div>
             <div class="stat-card">
               <div class="stat-label">Активных инцидентов</div>
               <div id="statActiveIncidents" class="stat-value">—</div>
@@ -68,7 +58,7 @@
               <div class="panel-header">
                 <h2>Инциденты по серьёзности</h2>
               </div>
-              <p class="section-hint">Данные обновляются каждые 10 секунд. Нажмите на сектор диаграммы или пункт легенды, чтобы открыть список инцидентов с описанием ошибки, приложением и временем обнаружения.</p>
+              <p class="section-hint">Нажмите на сектор диаграммы или пункт легенды, чтобы открыть список инцидентов с описанием ошибки, приложением и временем обнаружения.</p>
               <div id="chartContainer" class="chart-container"></div>
             </section>
 
@@ -138,19 +128,131 @@
         <div id="settingsView" class="view-content hidden">
           <section class="panel">
             <div class="panel-header">
-              <h2>Настройки</h2>
+              <h2>Управление пользователями</h2>
             </div>
-            <p>Раздел в разработке...</p>
+            <p class="section-hint">Добавляйте, редактируйте и удаляйте пользователей системы.</p>
+            
+            <div class="users-controls">
+              <button id="addUserBtn" class="btn-add">+ Добавить пользователя</button>
+            </div>
+            
+            <div class="users-table-container">
+              <table class="users-table">
+                <thead>
+                  <tr>
+                    <th>Имя пользователя</th>
+                    <th>Роль</th>
+                    <th>ФИО</th>
+                    <th>Email</th>
+                    <th>Телефон</th>
+                    <th>Действия</th>
+                  </tr>
+                </thead>
+                <tbody id="usersList"></tbody>
+              </table>
+            </div>
           </section>
+          
+          <!-- Modal for add/edit user -->
+          <div id="userModal" class="modal hidden">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h2 id="modalTitle">Добавить пользователя</h2>
+                <button class="modal-close" id="modalClose">&times;</button>
+              </div>
+              <form id="userForm" class="user-form">
+                <input type="hidden" id="editUserId">
+                <div class="form-group">
+                  <label for="modalUsername">Имя пользователя</label>
+                  <input type="text" id="modalUsername" required>
+                </div>
+                <div class="form-group">
+                  <label for="modalPassword">Пароль</label>
+                  <input type="password" id="modalPassword" minlength="4">
+                </div>
+                <div class="form-group">
+                  <label for="modalRole">Роль</label>
+                  <select id="modalRole">
+                    <option value="operator">Оператор</option>
+                    <option value="admin">Администратор</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="modalFullName">ФИО</label>
+                  <input type="text" id="modalFullName">
+                </div>
+                <div class="form-group">
+                  <label for="modalEmail">Email</label>
+                  <input type="email" id="modalEmail">
+                </div>
+                <div class="form-group">
+                  <label for="modalPhone">Телефон</label>
+                  <input type="tel" id="modalPhone">
+                </div>
+                <div class="form-actions">
+                  <button type="submit" class="btn-save">Сохранить</button>
+                  <button type="button" class="btn-cancel" id="modalCancel">Отмена</button>
+                </div>
+                <div id="userFormError" class="login-error hidden"></div>
+              </form>
+            </div>
+          </div>
         </div>
 
         <!-- Employee view -->
         <div id="employeeView" class="view-content hidden">
           <section class="panel">
             <div class="panel-header">
-              <h2>Информация для сотрудника</h2>
+              <h2>Профиль сотрудника</h2>
             </div>
-            <p>Текущий статус системы и рекомендации по безопасности.</p>
+            <p class="section-hint">Заполните информацию о себе для связи в случае возникновения инцидентов.</p>
+
+            <div id="profileInfo" class="profile-info">
+              <div class="profile-field">
+                <span class="profile-label">Имя пользователя:</span>
+                <span id="profileUsername" class="profile-value">—</span>
+              </div>
+              <div class="profile-field">
+                <span class="profile-label">Роль:</span>
+                <span id="profileRole" class="profile-value">—</span>
+              </div>
+            </div>
+
+            <form id="employeeProfileForm" class="employee-profile-form">
+              <div class="form-group">
+                <label for="fullName">ФИО</label>
+                <input type="text" id="fullName" name="full_name" placeholder="Иванов Иван Иванович">
+              </div>
+
+              <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" placeholder="ivan@example.com">
+              </div>
+
+              <div class="form-group">
+                <label for="phone">Телефон</label>
+                <input type="tel" id="phone" name="phone" placeholder="+7 (999) 123-45-67">
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn-save">Сохранить</button>
+                <span id="saveStatus" class="save-status"></span>
+              </div>
+            </form>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h2>Рекомендации по безопасности</h2>
+            </div>
+            <ul class="security-tips">
+              <li>Регулярно меняйте пароли (не реже 1 раза в 3 месяца)</li>
+              <li>Используйте сложные пароли (минимум 12 символов, буквы, цифры, спецсимволы)</li>
+              <li>Не используйте один пароль для разных систем</li>
+              <li>Блокируйте компьютер когда отходите от рабочего места</li>
+              <li>Не открывайте подозрительные вложения в письмах</li>
+              <li>Сообщайте в ИБ-службу о подозрительных событиях</li>
+            </ul>
           </section>
         </div>
 

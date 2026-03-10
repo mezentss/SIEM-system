@@ -3,12 +3,11 @@ const path = require('path');
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 700,
+    width: 1200,
+    height: 950,
     webPreferences: {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      // localStorage сохраняется по умолчанию в userData директории
       nodeIntegration: false
     }
   });

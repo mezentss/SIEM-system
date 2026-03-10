@@ -1,9 +1,3 @@
-"""
-Советы для пользователей по устранению инцидентов.
-
-Каждый уровень серьёзности имеет свой совет, который понятен обычному пользователю.
-"""
-
 from typing import TypedDict
 
 
@@ -14,7 +8,6 @@ class Advice(TypedDict):
     icon: str
 
 
-# Советы по уровням серьёзности
 SEVERITY_ADVICES: dict[str, Advice] = {
     "low": {
         "title": "Всё в порядке",
@@ -42,7 +35,7 @@ SEVERITY_ADVICES: dict[str, Advice] = {
 
 **Что можно сделать самостоятельно:**
 1. Сохраните открытые документы
-2. Перезапустите приложение (закройте и откройте снова)
+2. Перезапустите приложение
 3. Проверьте подключение к интернету
 4. Перезагрузите компьютер, если проблема не исчезнет
 
@@ -98,23 +91,20 @@ SEVERITY_ADVICES: dict[str, Advice] = {
 
 
 def get_advice_for_severity(severity: str) -> Advice:
-    """Возвращает совет для указанного уровня серьёзности."""
     severity_lower = (severity or "low").lower()
     return SEVERITY_ADVICES.get(severity_lower, SEVERITY_ADVICES["low"])
 
 
 def format_advice_for_telegram(severity: str, incident_type: str = "") -> str:
-    """Форматирует совет для отправки в Telegram."""
     advice = get_advice_for_severity(severity)
     
-    type_text = ""
-    if incident_type:
-        type_translations = {
-            "multiple_failed_logins": "множественные попытки входа",
-            "repeated_network_errors": "сетевые ошибки",
-            "service_crash_or_restart": "сбой службы",
-        }
-        type_text = type_translations.get(incident_type, incident_type)
+    type_translations = {
+        "multiple_failed_logins": "множественные попытки входа",
+        "repeated_network_errors": "сетевые ошибки",
+        "service_crash_or_restart": "сбой службы",
+    }
+    type_text = type_translations.get(incident_type, incident_type)
+    if type_text:
         type_text = f"\n\n**Тип проблемы:** {type_text}"
     
     return f"{advice['icon']} *{advice['title']}*{type_text}\n\n{advice['full']}"

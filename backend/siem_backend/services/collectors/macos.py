@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import datetime as dt
 import json
 import subprocess
@@ -8,7 +6,6 @@ from typing import Any, Optional
 
 from siem_backend.services.normalization import NormalizedEvent
 from siem_backend.services.collectors.base import LogCollector
-
 
 
 class MacOSLogCollector(LogCollector):
@@ -77,7 +74,6 @@ class MacOSLogCollector(LogCollector):
 
         ts_iso = self._to_iso(ts)
 
-        # Extract process/application name from macOS unified log record
         raw_data: dict[str, Any] = record
         process = record.get("processName") or record.get("process") or record.get("senderImageName") or ""
         subsystem = record.get("subsystem") or ""

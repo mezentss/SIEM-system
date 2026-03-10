@@ -8,7 +8,7 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
-from siem_backend.data.db import Base
+from siem_backend.data.schemas import Base
 
 
 class Event(Base):
@@ -78,17 +78,11 @@ class SeverityLevel(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(32), unique=True, index=True)
-    # Чем больше rank, тем критичнее уровень
     rank: Mapped[int] = mapped_column(Integer, index=True, default=0)
     description: Mapped[str] = mapped_column(Text, default="")
 
 
 class SourceCategoryRef(Base):
-    """
-    Справочник категорий источников событий (os, service, user_process и т.д.).
-    Имя выбрано SourceCategoryRef, чтобы не конфликтовать с полем Event.source_category.
-    """
-
     __tablename__ = "source_categories"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -97,11 +91,6 @@ class SourceCategoryRef(Base):
 
 
 class AnalysisRule(Base):
-    """
-    Метаданные правил анализа (пороговые значения, окна и т.п.).
-    Текущая реализация правил их не использует, но таблица нужна для расширения.
-    """
-
     __tablename__ = "analysis_rules"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -126,11 +115,6 @@ class AnalysisRule(Base):
 
 
 class SystemRun(Base):
-    """
-    Запуски анализа (meta-информация для аудита и отладки).
-    На текущий анализ не влияет.
-    """
-
     __tablename__ = "system_runs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -153,10 +137,6 @@ class SystemRun(Base):
 
 
 class LogSource(Base):
-    """
-    Источники логов (файлы, системные журналы, mock-источники и т.п.).
-    """
-
     __tablename__ = "log_sources"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -165,7 +145,6 @@ class LogSource(Base):
     source_type: Mapped[str] = mapped_column(String(32), index=True)
     description: Mapped[str] = mapped_column(Text, default="")
 
-    # Дополнительная конфигурация (пути, параметры подключения и т.п.)
     config: Mapped[dict] = mapped_column(JSON, default=dict)
 
     is_active: Mapped[int] = mapped_column(Integer, index=True, default=1)
@@ -177,11 +156,6 @@ class LogSource(Base):
 
 
 class RuleTrigger(Base):
-    """
-    Связка "правило — инцидент — событие": кто и когда сработал.
-    Не используется текущей логикой, но готово для расширения.
-    """
-
     __tablename__ = "rule_triggers"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -213,4 +187,3 @@ class RuleTrigger(Base):
 
     severity_at_trigger: Mapped[str] = mapped_column(String(16), index=True, default="")
     details: Mapped[dict] = mapped_column(JSON, default=dict)
-

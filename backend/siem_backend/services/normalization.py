@@ -1,7 +1,4 @@
-from __future__ import annotations
-
 import re
-
 from dataclasses import dataclass
 from typing import Any
 
@@ -18,7 +15,6 @@ class NormalizedEvent:
 
 
 class EventClassifier:
-    """Классификатор событий по типу и источнику."""
 
     AUTH_KEYWORDS = [
         "login", "logout", "authentication", "auth", "password", "credential",
@@ -44,8 +40,7 @@ class EventClassifier:
     ]
 
     @classmethod
-    def classify_event_type(cls, message: str, raw_data: dict[str, Any]) -> str:
-        """Определяет тип события на основе сообщения и сырых данных."""
+    def classify_event_type(cls, message: str, raw_data: dict) -> str:
         msg_lower = (message or "").lower()
 
         if any(kw in msg_lower for kw in cls.AUTH_KEYWORDS):
@@ -72,13 +67,10 @@ class EventClassifier:
         return "system"
 
     @classmethod
-    def classify_source_category(cls, message: str, raw_data: dict[str, Any], source_os: str) -> str:
-        """Определяет категорию источника события."""
-        # First check explicit fields from raw_data
+    def classify_source_category(cls, message: str, raw_data: dict, source_os: str) -> str:
         process = raw_data.get("process") or raw_data.get("service") or raw_data.get("application") or ""
         process_lower = str(process).lower()
 
-        # Known system services
         system_services = ["systemd", "launchd", "kernel", "init", "sshd", "cron", "rsyslog", "journald", "networkd", "udev", "dbus", "polkit", "network"]
         if process_lower in system_services or process_lower.startswith("system"):
             return "service"
@@ -93,8 +85,6 @@ class EventClassifier:
             return "user_process"
 
         msg_lower = (message or "").lower()
-        
-        # Check for .service pattern (systemd services like nginx.service)
         if re.search(r"\b[a-zA-Z0-9_-]+\.service", msg_lower):
             return "user_process"
         

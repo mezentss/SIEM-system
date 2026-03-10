@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Optional
 
 import bcrypt
@@ -16,7 +14,6 @@ def verify_password(password: str, hashed: str) -> bool:
     try:
         return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
     except Exception:
-        # Fallback: ensure hashed is bytes
         return bcrypt.checkpw(password.encode('utf-8'), hashed)
 
 

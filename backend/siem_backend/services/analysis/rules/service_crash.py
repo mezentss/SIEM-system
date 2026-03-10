@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import datetime as dt
 from typing import List
 
@@ -44,7 +42,6 @@ class ServiceCrashOrRestartRule(BaseRule):
         if count < self._threshold:
             return []
 
-        # Определяем серьёзность на основе количества событий
         severity = "low"
         if count >= 100:
             severity = "critical"

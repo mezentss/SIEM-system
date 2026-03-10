@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -29,7 +27,6 @@ def list_events(
     result: list[EventOut] = []
     for row in rows:
         item = EventOut.model_validate(row)
-        # Формируем человеко-читаемое описание события
         item.description = format_event_description(row)
         result.append(item)
 

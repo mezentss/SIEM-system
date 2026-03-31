@@ -1,27 +1,46 @@
 import datetime as dt
-from typing import List
+from typing import Dict, List
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from siem_backend.data.models import Event
+from siem_backend.data.models import Event, EventType, SeverityLevel
 from siem_backend.services.analysis.base import BaseRule
 from siem_backend.services.analysis.types import IncidentCandidate
 
 
 class MultipleFailedLoginsRule(BaseRule):
+    """Правило обнаружения множественных неудачных попыток входа."""
+    
     name = "multiple_failed_logins"
 
     def __init__(self, threshold: int = 5, window_minutes: int = 5) -> None:
         self._threshold = threshold
         self._window_minutes = window_minutes
+        
+        # Кэш для справочников
+        self._event_type_cache: Dict[str, int] = {}
+
+    def _get_event_type_id(self, db: Session, name: str) -> int:
+        """Получает ID типа события по названию."""
+        if name not in self._event_type_cache:
+            stmt = select(EventType.id).where(EventType.name == name)
+            result = db.execute(stmt).scalar_one_or_none()
+            if result:
+                self._event_type_cache[name] = result
+            else:
+                return 1  # Default ID
+        return self._event_type_cache.get(name, 1)
 
     def run(self, db: Session, *, since: dt.datetime, until: dt.datetime) -> List[IncidentCandidate]:
+        # Получаем ID типа события "authentication"
+        auth_type_id = self._get_event_type_id(db, "authentication")
+        
         stmt = (
             select(Event)
             .where(Event.ts >= since)
             .where(Event.ts <= until)
-            .where(Event.event_type == "authentication")
+            .where(Event.event_type_id == auth_type_id)
         )
         events = db.execute(stmt).scalars().all()
 

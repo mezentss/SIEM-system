@@ -24,6 +24,11 @@ def run_scheduled_analysis():
             incidents_found = service.run_analysis(db, since_minutes=60)
             if incidents_found > 0:
                 logger.info(f"Scheduled analysis found {incidents_found} incidents")
+            
+            # Автоматическое закрытие старых инцидентов
+            resolved = service.auto_resolve_inactive_incidents(db, minutes=60)
+            if resolved > 0:
+                logger.info(f"Auto-resolved {resolved} inactive incidents")
         finally:
             db.close()
     except Exception as e:

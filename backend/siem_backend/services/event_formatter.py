@@ -1,10 +1,45 @@
-from siem_backend.data.models import Event, Incident
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from siem_backend.data.models import Event, Incident, EventType, IncidentType, SeverityLevel, SourceCategoryRef
 
 
-def format_event_description(event: Event) -> str:
-    event_type = (event.event_type or "").lower()
-    category = (event.source_category or "").lower()
-    severity = (event.severity or "").lower()
+def format_event_description(event: Event, db: Session = None) -> str:
+    """
+    Формирует человеко-читаемое описание события.
+    
+    Args:
+        event: Событие
+        db: Сессия БД (опционально, для получения названий справочников)
+        
+    Returns:
+        Описание события
+    """
+    # Получаем названия из связанных объектов или через БД
+    event_type_name = ""
+    if event.event_type_rel:
+        event_type_name = event.event_type_rel.name
+    elif db:
+        stmt = select(EventType.name).where(EventType.id == event.event_type_id)
+        event_type_name = db.execute(stmt).scalar_one_or_none() or ""
+    
+    category_name = ""
+    if event.source_category_rel:
+        category_name = event.source_category_rel.name
+    elif db:
+        stmt = select(SourceCategoryRef.name).where(SourceCategoryRef.id == event.source_category_id)
+        category_name = db.execute(stmt).scalar_one_or_none() or ""
+    
+    severity_name = ""
+    if event.severity_rel:
+        severity_name = event.severity_rel.name
+    elif db:
+        stmt = select(SeverityLevel.name).where(SeverityLevel.id == event.severity_id)
+        severity_name = db.execute(stmt).scalar_one_or_none() or ""
+    
+    event_type = event_type_name.lower()
+    category = category_name.lower()
+    severity = severity_name.lower()
     msg = (event.message or "").strip()
     base: str
 
@@ -58,9 +93,34 @@ def format_event_description(event: Event) -> str:
     return base
 
 
-def format_incident_friendly_description(incident: Incident) -> str:
-    itype = (incident.incident_type or "").lower()
-    severity = (incident.severity or "").lower()
+def format_incident_friendly_description(incident: Incident, db: Session = None) -> str:
+    """
+    Формирует дружественное описание инцидента.
+    
+    Args:
+        incident: Инцидент
+        db: Сессия БД (опционально, для получения названий справочников)
+        
+    Returns:
+        Описание инцидента
+    """
+    # Получаем названия из связанных объектов или через БД
+    incident_type_name = ""
+    if incident.incident_type_rel:
+        incident_type_name = incident.incident_type_rel.name
+    elif db:
+        stmt = select(IncidentType.name).where(IncidentType.id == incident.incident_type_id)
+        incident_type_name = db.execute(stmt).scalar_one_or_none() or ""
+    
+    severity_name = ""
+    if incident.severity_rel:
+        severity_name = incident.severity_rel.name
+    elif db:
+        stmt = select(SeverityLevel.name).where(SeverityLevel.id == incident.severity_id)
+        severity_name = db.execute(stmt).scalar_one_or_none() or ""
+    
+    itype = incident_type_name.lower()
+    severity = severity_name.lower()
     details: dict = incident.details or {}
     count = details.get("count")
 

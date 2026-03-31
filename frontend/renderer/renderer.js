@@ -104,24 +104,43 @@ function updateDashboardStats({ events = [], incidents = [] } = {}) {
   const alertsTodayEl = document.getElementById('statAlertsToday');
   const healthEl = document.getElementById('statSystemHealth');
 
-  const totalIncidents = Array.isArray(incidents) ? incidents.length : 0;
+  // Считаем только активные инциденты (не решённые)
+  const activeIncidents = (Array.isArray(incidents) ? incidents : []).filter(
+    (inc) => (inc.status || 'active') === 'active'
+  );
+  const totalIncidents = activeIncidents.length;
 
   const now = new Date();
-  const incidentsToday = (Array.isArray(incidents) ? incidents : []).filter((inc) => {
+  const incidentsToday = activeIncidents.filter((inc) => {
     const ts = inc?.detected_at;
     return ts ? isSameDay(ts, now) : false;
   }).length;
 
-  const hasCritical = (Array.isArray(incidents) ? incidents : []).some(
-    (inc) => (inc?.severity || '').toLowerCase() === 'critical'
+  // Проверка наличия критических или высоких активных инцидентов
+  const hasCriticalOrHigh = activeIncidents.some(
+    (inc) => {
+      const sev = (inc?.severity || '').toLowerCase();
+      return sev === 'critical' || sev === 'high';
+    }
   );
 
   if (activeIncidentsEl) activeIncidentsEl.textContent = formatNumberRu(totalIncidents);
   if (alertsTodayEl) alertsTodayEl.textContent = formatNumberRu(incidentsToday);
 
   if (healthEl) {
-    healthEl.textContent = hasCritical ? 'Требует внимания' : 'Норма';
-    healthEl.style.color = hasCritical ? '#b63c3b' : '#2c3e50';
+    if (totalIncidents === 0) {
+      // Нет активных инцидентов — всё в порядке
+      healthEl.textContent = 'Всё в порядке';
+      healthEl.style.color = '#08df70'; // зелёный
+    } else if (hasCriticalOrHigh) {
+      // Есть критические или высокие активные инциденты — требует внимания
+      healthEl.textContent = 'Требует внимания';
+      healthEl.style.color = '#fa7415'; // оранжевый
+    } else {
+      // Есть только medium/low активные инциденты — критическое
+      healthEl.textContent = 'Критическое';
+      healthEl.style.color = '#ed4246'; // красный
+    }
   }
 }
 
@@ -646,6 +665,7 @@ function renderDrilldownList(incidents) {
 
     const type = toRussianDescription(inc);
     const sev = (inc.severity || 'unknown').toLowerCase();
+    const status = inc.status || 'active';  // Дефолтное значение
 
     const sevLabel = SEVERITY_LABELS[sev] || sev;
     const sevClass =
@@ -658,6 +678,22 @@ function renderDrilldownList(incidents) {
     const advice = getAdviceForSeverity(sev);
     const adviceText = advice?.short || 'Нет рекомендаций';
 
+    // Статус инцидента
+    const statusLabels = {
+      active: 'Активен',
+      resolved: 'Решён',
+      false_positive: 'Ложное сраб.'
+    };
+    const statusLabel = statusLabels[status] || status;
+
+    // Кнопка закрытия или открытия
+    let actionBtn;
+    if (status === 'active') {
+      actionBtn = `<button class="btn-resolve" data-incident-id="${inc.id}" data-action="close">Закрыть</button>`;
+    } else {
+      actionBtn = `<button class="btn-reopen" data-incident-id="${inc.id}" data-action="reopen">Открыть</button>`;
+    }
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${escapeHtml(dateStr)}</td>
@@ -665,11 +701,38 @@ function renderDrilldownList(incidents) {
       <td class="admin-only">${escapeHtml(type)}</td>
       <td><span class="detail-sev-badge ${sevClass}">${escapeHtml(sevLabel)}</span></td>
       <td>${escapeHtml(program)}</td>
+      <td><span class="status-badge ${status}">${statusLabel}</span></td>
       <td class="admin-only">${escapeHtml(inc.friendly_description || inc.description || '')}</td>
       <td class="operator-only"><span class="advice-badge ${sev}" title="${escapeHtml(advice?.full || adviceText)}">${advice?.icon || 'ℹ️'} ${escapeHtml(adviceText)}</span></td>
+      <td>${actionBtn}</td>
     `;
     tbody.appendChild(tr);
   }
+
+  // Добавляем обработчики кнопок "Закрыть" и "Открыть"
+  console.log('[DEBUG] Setting up button handlers, incidents:', incidents.length);
+  
+  const resolveBtns = tbody.querySelectorAll('.btn-resolve');
+  console.log('[DEBUG] Found resolve buttons:', resolveBtns.length);
+  resolveBtns.forEach(btn => {
+    console.log('[DEBUG] Adding resolve handler for incident:', btn.dataset.incidentId);
+    btn.addEventListener('click', () => {
+      const incidentId = btn.dataset.incidentId;
+      console.log('[DEBUG] Resolve clicked for:', incidentId);
+      openResolveModal(incidentId);
+    });
+  });
+
+  const reopenBtns = tbody.querySelectorAll('.btn-reopen');
+  console.log('[DEBUG] Found reopen buttons:', reopenBtns.length);
+  reopenBtns.forEach(btn => {
+    console.log('[DEBUG] Adding reopen handler for incident:', btn.dataset.incidentId);
+    btn.addEventListener('click', () => {
+      const incidentId = btn.dataset.incidentId;
+      console.log('[DEBUG] Reopen clicked for:', incidentId);
+      reopenIncident(incidentId);
+    });
+  });
 }
 
 function getAdviceForSeverity(severity) {
@@ -715,7 +778,6 @@ function renderRecentEvents(events) {
     const type = ev.event_type || '—';
     const severity = ev.severity || 'unknown';
     const source = ev.source_category || '—';
-    const status = ev.status === 'resolved' ? 'resolved' : 'active';
 
     const translatedType = {
       'auth_failed': 'Аутентификация',
@@ -741,14 +803,13 @@ function renderRecentEvents(events) {
       <td>${escapeHtml(translatedType)}</td>
       <td><span class="detail-sev-badge detail-sev-${severity}">${escapeHtml(SEVERITY_LABELS[severity] || severity)}</span></td>
       <td>${escapeHtml(translatedSource)}</td>
-      <td><span class="event-status ${status}">${status === 'resolved' ? 'Решено' : 'Активно'}</span></td>
     `;
     tbody.appendChild(tr);
   });
 }
 
 function switchView(viewName) {
-  const views = ['dashboard', 'map', 'reports', 'settings', 'employee'];
+  const views = ['dashboard', 'map', 'settings', 'employee'];
   const navItems = document.querySelectorAll('.topbar-nav-item');
 
   views.forEach(v => {
@@ -856,7 +917,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  startPolling();
+  // startPolling() вызывается позже, после инициализации currentUser
 });
 
 if (window.location.pathname.endsWith('login.html')) {
@@ -1068,43 +1129,49 @@ if (window.location.pathname.endsWith('login.html')) {
 
 function startPolling() {
   let pollingInterval = null;
-  
+
   function startInterval(intervalMs) {
     if (pollingInterval) {
       clearInterval(pollingInterval);
     }
     pollingInterval = setInterval(runPoll, intervalMs);
   }
-  
+
   function runPoll() {
     if (!currentUser) return;
-    
+
     const now = Date.now();
     const isFastPolling = now < fastPollingUntil;
-    
+
     if (currentUser.role === 'admin' && isFastPolling) {
       try {
         apiCall('/api/analyze/run?since_minutes=60', { method: 'POST' })
           .catch(() => {});
       } catch (_) {}
     }
-    
+
     checkNewIncidents();
     loadIncidentsAndChart();
-    
+
     if (!isFastPolling && currentUser.role === 'admin') {
       fastPollingUntil = Date.now() + FAST_POLL_DURATION_MS;
       startInterval(FAST_POLL_INTERVAL_MS);
     }
   }
-  
+
+  // Проверяем наличие currentUser перед запуском
+  if (!currentUser) {
+    console.warn('startPolling: currentUser is null, skipping polling');
+    return;
+  }
+
   if (currentUser.role === 'admin') {
     fastPollingUntil = Date.now() + FAST_POLL_DURATION_MS;
     startInterval(FAST_POLL_INTERVAL_MS);
   } else {
     startInterval(SLOW_POLL_INTERVAL_MS);
   }
-  
+
   scheduleMidnightRefresh();
 }
 
@@ -1336,7 +1403,7 @@ async function saveEmployeeProfile(event) {
     const headers = {
       'Content-Type': 'application/json',
     };
-    
+
     if (creds) {
       const [username, password] = atob(creds).split(':');
       headers['Authorization'] = 'Basic ' + btoa(username + ':' + password);
@@ -1348,6 +1415,30 @@ async function saveEmployeeProfile(event) {
       headers: headers,
       body: JSON.stringify(profile),
     });
+
+    // electronAPI.fetch возвращает распарсенный JSON, обычный fetch — Response
+    let updatedProfile;
+    if (resp && typeof resp === 'object' && !resp.status) {
+      updatedProfile = resp;
+    } else {
+      if (!resp.ok) {
+        throw new Error('Failed to save profile');
+      }
+      updatedProfile = await resp.json();
+    }
+
+    // Обновляем currentUser и UI
+    if (currentUser && updatedProfile) {
+      currentUser.full_name = updatedProfile.full_name || currentUser.full_name;
+      currentUser.email = updatedProfile.email || currentUser.email;
+      currentUser.phone = updatedProfile.phone || currentUser.phone;
+      
+      // Обновляем отображение имени в шапке
+      const usernameEl = document.getElementById('topbarUsername');
+      if (usernameEl) {
+        usernameEl.textContent = updatedProfile.full_name || currentUser.username;
+      }
+    }
 
     if (saveStatusEl) {
       saveStatusEl.textContent = '✓ Профиль сохранён';
@@ -1442,11 +1533,11 @@ function closeUserModal() {
 
 async function saveUser(event) {
   event.preventDefault();
-  
+
   const userId = document.getElementById('editUserId').value;
   const errorEl = document.getElementById('userFormError');
   errorEl.classList.add('hidden');
-  
+
   try {
     const userData = {
       username: document.getElementById('modalUsername').value,
@@ -1456,33 +1547,39 @@ async function saveUser(event) {
       email: document.getElementById('modalEmail').value || null,
       phone: document.getElementById('modalPhone').value || null,
     };
-    
+
     if (!userId && !userData.password) {
       throw new Error('Пароль обязателен для нового пользователя');
     }
-    
+
     const url = userId ? `/api/users/${userId}` : '/api/users';
     const method = userId ? 'PUT' : 'POST';
-    
+
+    // Используем fetch напрямую с правильными заголовками
     const fetchFn = window.electronAPI?.fetch || window.fetch;
-    const headers = { 'Content-Type': 'application/json' };
-    const creds = localStorage.getItem(AUTH_CREDS_KEY);
-    if (creds) {
-      const [username, password] = atob(creds).split(':');
-      headers['Authorization'] = 'Basic ' + btoa(username + ':' + password);
-    }
-    
+    const headers = {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    };
+
     const resp = await fetchFn(API_BASE + url, {
       method: method,
       headers: headers,
       body: JSON.stringify(userData),
     });
-    
-    if (!resp.ok) {
-      const error = await resp.json().catch(() => ({ detail: 'Operation failed' }));
-      throw new Error(error.detail || 'Operation failed');
+
+    // electronAPI.fetch возвращает распарсенный JSON, обычный fetch — Response
+    let result;
+    if (resp && typeof resp === 'object' && !resp.status) {
+      result = resp;
+    } else {
+      if (!resp.ok) {
+        const error = await resp.json().catch(() => ({ detail: 'Operation failed' }));
+        throw new Error(error.detail || 'Operation failed');
+      }
+      result = await resp.json();
     }
-    
+
     closeUserModal();
     loadUsersList();
   } catch (err) {
@@ -1521,10 +1618,169 @@ async function deleteUser(userId) {
       }
       result = await resp.json();
     }
-    
+
     loadUsersList();
   } catch (err) {
     console.error('[USERS] Failed to delete user:', err);
     alert('Ошибка удаления: ' + err.message);
+  }
+}
+
+// Incident resolution modal
+function openResolveModal(incidentId) {
+  const modal = document.getElementById('resolveModal');
+  const form = document.getElementById('resolveForm');
+  
+  form.reset();
+  document.getElementById('resolveIncidentId').value = incidentId;
+  modal.classList.remove('hidden');
+}
+
+function closeResolveModal() {
+  const modal = document.getElementById('resolveModal');
+  modal.classList.add('hidden');
+}
+
+async function submitResolveIncident(event) {
+  event.preventDefault();
+  
+  const incidentId = document.getElementById('resolveIncidentId').value;
+  const notes = document.getElementById('resolveNotes').value;
+  
+  try {
+    const fetchFn = window.electronAPI?.fetch || window.fetch;
+    const headers = { 'Content-Type': 'application/json' };
+    const creds = localStorage.getItem(AUTH_CREDS_KEY);
+    if (creds) {
+      const [username, password] = atob(creds).split(':');
+      headers['Authorization'] = 'Basic ' + btoa(username + ':' + password);
+    }
+    
+    const resp = await fetchFn(API_BASE + `/api/incidents/${incidentId}/resolve`, {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({ notes: notes || null }),
+    });
+
+    // Проверка: electronAPI.fetch возвращает объект с данными
+    // Обычный fetch возвращает Response объект (есть status)
+    let result;
+    if (resp.id !== undefined || resp.incident_type !== undefined) {
+      // Это уже распарсенный JSON от electronAPI
+      result = resp;
+    } else if (resp.status === 200 || resp.status === 201) {
+      // Это Response объект от обычного fetch
+      result = await resp.json();
+    } else {
+      // Ошибка
+      const errorData = await resp.json().catch(() => ({ detail: 'Resolve failed' }));
+      throw new Error(errorData.detail || 'Resolve failed');
+    }
+    
+    closeResolveModal();
+
+    // Обновляем статус в allIncidents
+    const incident = allIncidents.find(inc => inc.id === parseInt(incidentId));
+    if (incident) {
+      incident.status = 'resolved';
+    }
+
+    // Обновляем таблицу инцидентов
+    const currentSeverity = drilldownSeverity;
+    if (currentSeverity) {
+      const filtered = allIncidents.filter(inc =>
+        (inc.severity || 'unknown').toLowerCase() === currentSeverity
+      );
+      renderDrilldownList(filtered);
+    }
+
+    // Показываем уведомление
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-visible';
+    toast.textContent = '✓ Инцидент закрыт';
+    document.getElementById('toastContainer').appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+
+  } catch (err) {
+    console.error('[RESOLVE] Failed to resolve incident:', err);
+    alert('Ошибка закрытия инцидента: ' + err.message);
+  }
+}
+
+// Add event listeners for resolve modal
+const resolveModalClose = document.getElementById('resolveModalClose');
+if (resolveModalClose) {
+  resolveModalClose.addEventListener('click', closeResolveModal);
+}
+
+const resolveModalCancel = document.getElementById('resolveModalCancel');
+if (resolveModalCancel) {
+  resolveModalCancel.addEventListener('click', closeResolveModal);
+}
+
+const resolveForm = document.getElementById('resolveForm');
+if (resolveForm) {
+  resolveForm.addEventListener('submit', submitResolveIncident);
+}
+
+// Reopen incident function
+async function reopenIncident(incidentId) {
+  if (!confirm('Открыть этот инцидент снова?')) {
+    return;
+  }
+  
+  try {
+    const fetchFn = window.electronAPI?.fetch || window.fetch;
+    const headers = { 'Content-Type': 'application/json' };
+    const creds = localStorage.getItem(AUTH_CREDS_KEY);
+    if (creds) {
+      const [username, password] = atob(creds).split(':');
+      headers['Authorization'] = 'Basic ' + btoa(username + ':' + password);
+    }
+    
+    const resp = await fetchFn(API_BASE + `/api/incidents/${incidentId}/reopen`, {
+      method: 'POST',
+      headers: headers,
+    });
+    
+    // Проверка: electronAPI.fetch возвращает объект с данными
+    // Обычный fetch возвращает Response объект (есть status)
+    if (resp.id !== undefined || resp.incident_type !== undefined) {
+      // Это уже распарсенный JSON от electronAPI
+      result = resp;
+    } else if (resp.status === 200 || resp.status === 201) {
+      // Это Response объект от обычного fetch
+      result = await resp.json();
+    } else {
+      // Ошибка
+      const errorData = await resp.json().catch(() => ({ detail: 'Reopen failed' }));
+      throw new Error(errorData.detail || 'Reopen failed');
+    }
+    
+    // Обновляем статус в allIncidents
+    const incident = allIncidents.find(inc => inc.id === parseInt(incidentId));
+    if (incident) {
+      incident.status = 'active';
+    }
+    
+    // Обновляем таблицу инцидентов
+    const currentSeverity = drilldownSeverity;
+    if (currentSeverity) {
+      const filtered = allIncidents.filter(inc => 
+        (inc.severity || 'unknown').toLowerCase() === currentSeverity
+      );
+      renderDrilldownList(filtered);
+    }
+    
+    // Показываем уведомление
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-visible';
+    toast.textContent = '✓ Инцидент открыт';
+    document.getElementById('toastContainer').appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+    
+  } catch (err) {
+    console.error('[REOPEN] Failed to reopen incident:', err);
+    alert('Ошибка открытия инцидента: ' + err.message);
   }
 }

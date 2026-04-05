@@ -28,21 +28,45 @@ function getAuthHeaders() {
 
 async function apiCall(url, options = {}) {
   const fetchFn = window.electronAPI?.fetch || window.fetch;
+  
   const resp = await fetchFn(API_BASE + url, {
     headers: { ...getAuthHeaders(), ...(options.headers || {}) },
     ...options,
   });
-  if (resp && typeof resp === 'object' && !resp.status && !resp.statusCode) {
+  
+  // Проверяем, это обычный fetch Response или electronAPI response object
+  const isResponseObject = resp && typeof resp === 'object' && (resp.status || resp.ok !== undefined);
+  
+  if (!isResponseObject) {
+    // electronAPI.fetch уже вернул распарсенный JSON (старый формат)
     return resp;
   }
-  const status = resp.status ?? resp.statusCode ?? resp.ok ? 200 : 500;
-  const statusText = resp.statusText ?? resp.statusMessage ?? '';
-  if (status !== 200) {
+  
+  const status = resp.status || 200;
+  const statusText = resp.statusText || '';
+  
+  if (!resp.ok) {
     if (status === 401) {
       logout();
     }
-    throw new Error(`HTTP ${status}: ${statusText}`);
+    // Пытаемся получить текст ошибки
+    try {
+      const errorText = await resp.text();
+      let errorDetail = statusText || `HTTP ${status}`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.detail) {
+          errorDetail = typeof errorJson.detail === 'string' 
+            ? errorJson.detail 
+            : JSON.stringify(errorJson.detail);
+        }
+      } catch (_) {}
+      throw new Error(errorDetail);
+    } catch (err) {
+      throw new Error(`HTTP ${status}: ${statusText || err.message}`);
+    }
   }
+  
   const text = await resp.text();
   try {
     return JSON.parse(text);

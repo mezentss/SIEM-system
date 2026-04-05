@@ -2,17 +2,35 @@ const { contextBridge } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   fetch: async (url, options) => {
-    const response = await fetch(url, options);
+    try {
+      const response = await fetch(url, options);
 
-    // Бросаем осмысленную ошибку при неуспешном статусе
-    if (!response.ok) {
-      const text = await response.text().catch(() => '');
-      throw new Error(`HTTP ${response.status}: ${text || response.statusText}`);
+      // Возвращаем response object с методами для совместимости с обычным fetch
+      return {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        json: async () => {
+          if (!response.ok) {
+            const text = await response.text().catch(() => '');
+            throw new Error(`HTTP ${response.status}: ${text || response.statusText}`);
+          }
+          return response.json();
+        },
+        text: async () => response.text(),
+      };
+    } catch (err) {
+      // При ошибке сети возвращаем объект с ошибкой
+      return {
+        ok: false,
+        status: 0,
+        statusText: err.message,
+        json: async () => { throw err; },
+        text: async () => err.message,
+      };
     }
-
-    return response.json();
   },
-  
+
   // Метод для сохранения данных перед закрытием
   saveAppState: (key, value) => {
     try {
@@ -23,7 +41,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return false;
     }
   },
-  
+
   // Метод для загрузки сохранённых данных
   loadAppState: (key) => {
     try {

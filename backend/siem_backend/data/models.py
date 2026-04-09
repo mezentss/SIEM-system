@@ -5,8 +5,8 @@ import datetime as dt
 from typing import Optional
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, event
-from sqlalchemy.dialects.sqlite import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import JSON
 
 from siem_backend.data.schemas import Base
 

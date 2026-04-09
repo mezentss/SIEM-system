@@ -1,0 +1,91 @@
+version: '3.8'
+
+# =============================================================================
+# Docker Compose для SIEM-системы
+# =============================================================================
+# Запуск:
+#   docker-compose up -d
+# 
+# Остановка:
+#   docker-compose down
+# 
+# Просмотр логов:
+#   docker-compose logs -f
+
+services:
+  # ==========================================================================
+  # PostgreSQL — серверная база данных
+  # ==========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: siem-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-siem_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-siem_password}
+      POSTGRES_DB: ${POSTGRES_DB:-siem_db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql  # Опционально
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-siem_user} -d ${POSTGRES_DB:-siem_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - siem-network
+
+  # ==========================================================================
+  # pgAdmin — веб-интерфейс для управления PostgreSQL (опционально)
+  # ==========================================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: siem-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@siem.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - siem-network
+
+  # ==========================================================================
+  # Backend — FastAPI сервер
+  # ==========================================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: siem-backend
+    restart: unless-stopped
+    environment:
+      SIEM_DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-siem_user}:${POSTGRES_PASSWORD:-siem_password}@postgres:5432/${POSTGRES_DB:-siem_db}
+      SIEM_TELEGRAM_BOT_TOKEN: ${SIEM_TELEGRAM_BOT_TOKEN:-}
+      SIEM_TELEGRAM_CHAT_ID: ${SIEM_TELEGRAM_CHAT_ID:-}
+      SIEM_LOG_LEVEL: ${SIEM_LOG_LEVEL:-INFO}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - siem-network
+
+volumes:
+  postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  siem-network:
+    driver: bridge

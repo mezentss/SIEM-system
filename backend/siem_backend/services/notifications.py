@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from siem_backend.core.config import settings
-from siem_backend.data.models import Event, Incident, Notification, NotificationType, SeverityLevel
+from siem_backend.data.models import Event, Incident, IncidentType, Notification, NotificationType, SeverityLevel
 from siem_backend.data.notification_repository import NotificationRepository
 
 

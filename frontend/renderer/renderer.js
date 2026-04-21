@@ -13,9 +13,9 @@ let drilldownQuery = '';
 let currentUser = null;
 
 let fastPollingUntil = 0;
-const FAST_POLL_INTERVAL_MS = 10000;
-const SLOW_POLL_INTERVAL_MS = 5 * 60 * 1000;
-const FAST_POLL_DURATION_MS = 60 * 1000;
+const FAST_POLL_INTERVAL_MS = 3000;  // 3 секунды — реальное время
+const SLOW_POLL_INTERVAL_MS = 10000; // 10 секунд
+const FAST_POLL_DURATION_MS = 10 * 60 * 1000; // 10 минут быстрого polling
 
 function getAuthHeaders() {
   const creds = localStorage.getItem(AUTH_CREDS_KEY);
@@ -233,17 +233,35 @@ function showNewIncidentToast(incident) {
   const container = document.getElementById('toastContainer');
   if (!container) return;
   const description = toRussianDescription(incident);
-  const msg = `Обнаружен новый инцидент: ${description}`;
+  const msg = `🚨 Новый инцидент: ${description}`;
   const toast = document.createElement('div');
   toast.className = 'toast toast-new-incident';
   toast.setAttribute('role', 'alert');
   toast.textContent = msg;
   container.appendChild(toast);
   requestAnimationFrame(() => toast.classList.add('toast-visible'));
+  
+  // Звуковое оповещение
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    oscillator.frequency.value = 800;
+    oscillator.type = 'sine';
+    gainNode.gain.value = 0.3;
+    oscillator.start();
+    setTimeout(() => {
+      oscillator.stop();
+      audioCtx.close();
+    }, 200);
+  } catch (_) {}
+  
   setTimeout(() => {
     toast.classList.remove('toast-visible');
     setTimeout(() => toast.remove(), 300);
-  }, 6000);
+  }, 8000);
 }
 
 async function fetchIncidents() {
@@ -1167,13 +1185,23 @@ function startPolling() {
     const now = Date.now();
     const isFastPolling = now < fastPollingUntil;
 
-    if (currentUser.role === 'admin' && isFastPolling) {
+    // Сначала собираем новые события из файла логов (для ВСЕХ пользователей)
+    if (isFastPolling) {
+      try {
+        apiCall('/api/collect/auto', { method: 'POST' })
+          .catch(() => {});
+      } catch (_) {}
+    }
+
+    // Затем запускаем анализ инцидентов (для ВСЕХ пользователей)
+    if (isFastPolling) {
       try {
         apiCall('/api/analyze/run?since_minutes=60', { method: 'POST' })
           .catch(() => {});
       } catch (_) {}
     }
 
+    // Обновляем данные на экране
     checkNewIncidents();
     loadIncidentsAndChart();
 
@@ -1189,12 +1217,9 @@ function startPolling() {
     return;
   }
 
-  if (currentUser.role === 'admin') {
-    fastPollingUntil = Date.now() + FAST_POLL_DURATION_MS;
-    startInterval(FAST_POLL_INTERVAL_MS);
-  } else {
-    startInterval(SLOW_POLL_INTERVAL_MS);
-  }
+  // Для всех пользователей: быстрый polling первую минуту, потом медленный
+  fastPollingUntil = Date.now() + FAST_POLL_DURATION_MS;
+  startInterval(FAST_POLL_INTERVAL_MS);
 
   scheduleMidnightRefresh();
 }

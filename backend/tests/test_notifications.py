@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, MagicMock
 
 from siem_backend.services.notifications import get_telegram_advice, incident_text_ru
 from siem_backend.services.normalization import EventClassifier
@@ -38,52 +38,74 @@ class TestTelegramAdvice(unittest.TestCase):
 
 
 class TestIncidentTextRu(unittest.TestCase):
+    """Тесты формирования текста инцидента (нормализованная модель)."""
+
+    def _create_mock_incident(self, incident_type_id: int, severity_id: int, description: str, details: dict):
+        """Создаёт мок инцидента с нормализованной структурой."""
+        incident = Mock(spec=Incident)
+        incident.id = 1
+        incident.incident_type_id = incident_type_id
+        incident.incident_type_rel = None
+        incident.severity_id = severity_id
+        incident.severity_rel = None
+        incident.description = description
+        incident.details = details
+        incident.event_id = None
+        return incident
 
     def test_multiple_failed_logins(self):
-        incident = Incident(
-            id=1,
-            incident_type="multiple_failed_logins",
-            severity="high",
+        db = Mock()
+        db.execute.return_value.scalar_one_or_none.return_value = "multiple_failed_logins"
+        
+        incident = self._create_mock_incident(
+            incident_type_id=1,
+            severity_id=3,
             description="Test",
             details={"count": 5}
         )
-        text = incident_text_ru(incident)
+        text = incident_text_ru(incident, db)
         self.assertIn("неуспешные попытки входа", text)
 
     def test_repeated_network_errors(self):
-        incident = Incident(
-            id=1,
-            incident_type="repeated_network_errors",
-            severity="high",
+        db = Mock()
+        db.execute.return_value.scalar_one_or_none.return_value = "repeated_network_errors"
+        
+        incident = self._create_mock_incident(
+            incident_type_id=2,
+            severity_id=3,
             description="Test",
             details={"events_count": 15, "window_minutes": 10}
         )
-        text = incident_text_ru(incident)
+        text = incident_text_ru(incident, db)
         self.assertIn("повторяющиеся сетевые ошибки", text)
         self.assertIn("15", text)
         self.assertIn("10", text)
 
     def test_service_crash_with_name(self):
-        incident = Incident(
-            id=1,
-            incident_type="service_crash_or_restart",
-            severity="critical",
+        db = Mock()
+        db.execute.return_value.scalar_one_or_none.return_value = "service_crash_or_restart"
+        
+        incident = self._create_mock_incident(
+            incident_type_id=3,
+            severity_id=4,
             description="Test",
             details={"service": "nginx"}
         )
-        text = incident_text_ru(incident)
+        text = incident_text_ru(incident, db)
         self.assertIn("сбой или перезапуск службы", text)
         self.assertIn("nginx", text)
 
     def test_service_crash_without_name(self):
-        incident = Incident(
-            id=1,
-            incident_type="service_crash_or_restart",
-            severity="critical",
+        db = Mock()
+        db.execute.return_value.scalar_one_or_none.return_value = "service_crash_or_restart"
+        
+        incident = self._create_mock_incident(
+            incident_type_id=3,
+            severity_id=4,
             description="Test",
             details={}
         )
-        text = incident_text_ru(incident)
+        text = incident_text_ru(incident, db)
         self.assertIn("сбой или перезапуск службы", text)
         self.assertNotIn("nginx", text)
 

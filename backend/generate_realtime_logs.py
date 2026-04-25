@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""
+'''
 Генератор тестовых логов в реальном времени.
 Добавляет новые ошибки в файл логов каждые 5 секунд.
 
 Запуск:
     python3 generate_realtime_logs.py
-"""
+
+'''
 
 import datetime
 import random

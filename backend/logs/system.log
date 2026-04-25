@@ -18448,3 +18448,60 @@
 2026-04-21 10:16:19,000 ERROR nginx[2109]: Connection refused to database-server:443
 2026-04-21 10:16:24,000 ERROR sshd[1325]: Failed login attempt for user root
 2026-04-21 10:16:29,000 ERROR nginx[9095]: Socket error: connection timed out
+2026-04-21 10:16:34,000 ERROR nginx[5444]: DNS lookup failed for 192.168.1.100
+2026-04-21 10:16:39,000 ERROR nginx[7023]: Connection refused to backend-server:80
+2026-04-21 10:16:44,000 ERROR nginx[4872]: Connection refused to cache-server:6379
+2026-04-21 10:16:49,000 ERROR nginx[3255]: DNS lookup failed for 10.0.0.5
+2026-04-21 10:16:54,000 ERROR sshd[1225]: Failed password for user testuser
+2026-04-21 10:16:59,000 ERROR systemd[1]: redis.service: Main process exited, status=1/FAILURE
+2026-04-21 10:17:04,000 CRITICAL zoom[3674]: Application crashed: out of memory
+2026-04-21 10:17:09,000 ERROR nginx[5953]: Socket error: connection timed out
+2026-04-21 10:17:14,000 ERROR sshd[3965]: Failed password for user user1
+2026-04-21 10:17:19,000 ERROR nginx[5202]: Connection timeout to cache-server:9200
+2026-04-21 10:17:24,000 ERROR nginx[9385]: Connection timeout to 192.168.1.100:9200
+2026-04-21 10:17:29,000 ERROR nginx[3826]: Connection timeout to cache-server:9200
+2026-04-21 10:17:34,000 ERROR nginx[2164]: Network unreachable to cache-server:9200
+2026-04-21 10:17:39,000 ERROR nginx[7750]: Connection timeout to database-server:8080
+2026-04-21 10:17:44,000 ERROR sshd[6909]: Failed password for user admin
+2026-04-21 10:17:49,000 ERROR nginx[2320]: Connection refused to cache-server:5432
+2026-04-21 10:17:54,000 ERROR sshd[4565]: Failed login attempt for user testuser
+2026-04-21 10:17:59,000 ERROR sshd[1140]: Failed login attempt for user user1
+2026-04-21 10:18:04,000 CRITICAL zoom[6645]: Application crashed: out of memory
+2026-04-21 10:18:09,000 ERROR nginx[8381]: Network unreachable to 192.168.1.100:9200
+2026-04-21 10:18:14,000 ERROR sshd[3619]: Failed password for user operator
+2026-04-21 10:18:19,000 ERROR nginx[1230]: Connection refused to 10.0.0.5:8080
+2026-04-21 10:18:24,000 CRITICAL launchd[0]: mysql terminated unexpectedly
+2026-04-21 10:18:29,000 CRITICAL zoom[3542]: Application crashed: out of memory
+2026-04-21 10:18:34,000 ERROR nginx[3613]: DNS lookup failed for database-server
+2026-04-21 10:18:39,000 ERROR nginx[3965]: Network unreachable to backend-server:443
+2026-04-21 10:18:44,000 CRITICAL zoom[9451]: Application crashed: out of memory
+2026-04-21 10:18:49,000 ERROR sshd[2240]: Failed password for user operator
+2026-04-21 10:18:54,000 ERROR nginx[1757]: Connection timeout to 192.168.1.100:6379
+2026-04-21 10:18:59,000 ERROR nginx[1028]: Socket error: connection timed out
+2026-04-21 10:19:04,000 ERROR sshd[5425]: Failed password for user user1
+2026-04-21 10:19:09,000 ERROR sshd[8059]: Failed login attempt for user root
+2026-04-21 10:19:14,000 ERROR nginx[6487]: Connection timeout to 10.0.0.5:9200
+2026-04-21 10:19:19,000 ERROR nginx[9422]: Socket error: connection timed out
+2026-04-21 10:19:24,000 ERROR nginx[3865]: Connection timeout to 10.0.0.5:80
+2026-04-21 10:19:29,000 ERROR nginx[8024]: Connection timeout to 10.0.0.5:80
+2026-04-21 10:19:34,000 ERROR nginx[3556]: Socket error: connection timed out
+2026-04-21 10:19:39,000 CRITICAL zoom[8207]: Application crashed: out of memory
+2026-04-21 10:19:44,000 ERROR nginx[6595]: Connection refused to database-server:9200
+2026-04-21 10:19:49,000 CRITICAL launchd[0]: postgresql terminated unexpectedly
+2026-04-21 10:19:54,000 ERROR nginx[8519]: Connection timeout to backend-server:5432
+2026-04-21 10:19:59,000 ERROR sshd[7028]: Failed login attempt for user root
+2026-04-21 10:20:04,000 ERROR nginx[8309]: DNS lookup failed for backend-server
+2026-04-21 10:20:09,000 CRITICAL launchd[0]: elasticsearch terminated unexpectedly
+2026-04-21 10:20:14,000 ERROR nginx[8631]: Network unreachable to backend-server:9200
+2026-04-21 10:20:19,000 ERROR nginx[6400]: DNS lookup failed for 192.168.1.100
+2026-04-21 10:20:24,000 ERROR sshd[4692]: Failed password for user admin
+2026-04-21 10:20:29,000 ERROR sshd[4625]: Failed password for user operator
+2026-04-21 10:20:34,000 ERROR nginx[7386]: Socket error: connection timed out
+2026-04-21 10:20:39,000 ERROR sshd[8422]: Failed password for user operator
+2026-04-21 10:20:44,000 ERROR sshd[7585]: Failed login attempt for user admin
+2026-04-21 10:20:49,000 CRITICAL zoom[7464]: Application crashed: out of memory
+2026-04-21 10:20:54,000 ERROR sshd[2030]: Failed password for user testuser
+2026-04-21 10:20:59,000 ERROR sshd[8041]: Failed password for user operator
+2026-04-21 10:21:04,000 ERROR nginx[7350]: DNS lookup failed for database-server
+2026-04-21 10:21:09,000 ERROR nginx[5102]: Socket error: connection timed out
+2026-04-21 10:21:14,000 CRITICAL launchd[0]: docker terminated unexpectedly
